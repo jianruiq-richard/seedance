@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Seedance",
-  description: "Seedance",
+  title: "Seedance 2.0",
+  description: "Seedance 2.0",
 };
 
 export default function RootLayout({
