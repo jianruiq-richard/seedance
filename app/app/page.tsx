@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { UserButton, useClerk, useUser } from "@clerk/nextjs";
 
 const styles = [
   "Cinematic Glow",
@@ -37,6 +38,9 @@ const ratioSizeMap = {
 } as const;
 
 export default function AppPage() {
+  const { user } = useUser();
+  const { signOut } = useClerk();
+  const isSignedIn = Boolean(user);
   const [mode, setMode] = useState<Mode>("text");
   const [prompt, setPrompt] = useState(
     "Neon city streets, slow motion, cinematic glow"
@@ -53,6 +57,9 @@ export default function AppPage() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [seed, setSeed] = useState<number>(Date.now());
+
+  const credits =
+    (user?.publicMetadata?.credits as number | undefined) ?? 120;
 
   const cleanupUrls = useRef<string[]>([]);
 
@@ -124,13 +131,41 @@ export default function AppPage() {
             <span className="inline-flex h-2 w-2 rounded-full bg-[#f7c578]" />
             <span className="text-lg font-semibold">Seedance Studio</span>
           </div>
-          <div className="flex items-center gap-3 text-sm text-white/70">
+          <div className="flex items-center gap-4 text-sm text-white/70">
             <Link className="hover:text-white" href="/">
               Home
             </Link>
-            <Link className="hover:text-white" href="/sign-in">
-              Account
-            </Link>
+            {isSignedIn ? (
+              <>
+                <div className="hidden items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 md:flex">
+                  <span className="text-white/60">Credits</span>
+                  <span className="font-semibold text-white">{credits}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <UserButton
+                    appearance={{
+                      elements: {
+                        userButtonAvatarBox: "h-8 w-8",
+                      },
+                    }}
+                  />
+                  <button
+                    className="rounded-full border border-white/20 px-3 py-1 text-xs text-white/80 transition hover:border-white/60 hover:text-white"
+                    onClick={() => signOut()}
+                    type="button"
+                  >
+                    Sign out
+                  </button>
+                </div>
+              </>
+            ) : (
+              <Link
+                className="rounded-full border border-white/20 px-3 py-1 text-xs text-white/80 transition hover:border-white/60 hover:text-white"
+                href="/sign-in"
+              >
+                Sign in
+              </Link>
+            )}
           </div>
         </div>
       </div>
