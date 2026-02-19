@@ -26,7 +26,7 @@ function getStripe() {
     throw new Error("Missing STRIPE_SECRET_KEY");
   }
   return new Stripe(stripeSecretKey, {
-    apiVersion: "2024-06-20",
+    apiVersion: Stripe.LatestApiVersion,
   });
 }
 
