@@ -1,9 +1,8 @@
 import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
-import { updateUserCreditsWithLog } from "../actions";
+import { updateUserCreditsWithLog } from "../users/actions";
 
 export const dynamic = "force-dynamic";
-export const dynamicParams = true;
 
 function isAdminEmail(email: string | null) {
   if (!email) return false;
@@ -21,11 +20,10 @@ function toNumber(value: string | null) {
 }
 
 type PageProps = {
-  params: { id: string };
+  searchParams: Promise<{ userId?: string }>;
 };
 
-export default async function AdminUserDetailPage({ params }: PageProps) {
-  const userId = params?.id ?? "";
+export default async function AdminUserDetailPage({ searchParams }: PageProps) {
   const user = await currentUser();
   const primaryEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
@@ -42,16 +40,15 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
     );
   }
 
+  const resolvedParams = await searchParams;
+  const userId = resolvedParams.userId ?? "";
   if (!userId) {
     return (
       <div className="min-h-screen bg-[#0a0b10] text-white">
         <div className="mx-auto max-w-3xl px-6 py-24">
           <h1 className="text-2xl font-semibold">User not found</h1>
           <p className="mt-3 text-sm text-white/60">
-            Missing user id in the route.
-          </p>
-          <p className="mt-4 text-xs text-white/40">
-            Params: {JSON.stringify(params)}
+            Missing user id in the query string.
           </p>
           <Link className="mt-6 inline-block text-sm text-white/60 hover:text-white" href="/admin/users">
             Back to users
@@ -70,9 +67,7 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
       <div className="min-h-screen bg-[#0a0b10] text-white">
         <div className="mx-auto max-w-3xl px-6 py-24">
           <h1 className="text-2xl font-semibold">User not found</h1>
-          <p className="mt-3 text-sm text-white/60">
-            Could not load user {userId}.
-          </p>
+          <p className="mt-3 text-sm text-white/60">Could not load user {userId}.</p>
           <Link className="mt-6 inline-block text-sm text-white/60 hover:text-white" href="/admin/users">
             Back to users
           </Link>
@@ -80,6 +75,7 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
       </div>
     );
   }
+
   const email = target.emailAddresses?.[0]?.emailAddress ?? "—";
   const name = target.fullName ?? target.username ?? "Unnamed";
   const credits =
@@ -134,7 +130,7 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
                 );
                 const reason = (formData.get("reason")?.toString() ?? "").trim();
                 await updateUserCreditsWithLog(
-                  params.id,
+                  userId,
                   Math.max(nextCredits, 0),
                   primaryEmail,
                   reason || "Manual adjustment"

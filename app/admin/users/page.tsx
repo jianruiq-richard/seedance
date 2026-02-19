@@ -62,6 +62,7 @@ export default async function AdminUsersPage() {
                   <div>
                     <p className="text-sm font-semibold text-white">{name}</p>
                     <p className="text-xs text-white/50">{email}</p>
+                    <p className="text-xs text-white/40">{entry.id}</p>
                   </div>
                   <div className="text-sm text-white/70">
                     Credits: <span className="font-semibold">{credits}</span>
@@ -69,13 +70,13 @@ export default async function AdminUsersPage() {
                   <div className="flex items-center gap-2">
                     <Link
                       className="rounded-full border border-white/20 px-3 py-2 text-xs text-white/80 transition hover:border-white/60 hover:text-white"
-                      href={`/admin/users/${entry.id}`}
+                      href={`/admin/user?userId=${entry.id}`}
                     >
                       View details
                     </Link>
                     <Link
                       className="rounded-full bg-white px-3 py-2 text-xs font-semibold text-[#0a0b10]"
-                      href={`/admin/users/${entry.id}`}
+                      href={`/admin/user?userId=${entry.id}`}
                     >
                       Update
                     </Link>
