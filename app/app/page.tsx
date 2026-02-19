@@ -62,7 +62,7 @@ export default function AppPage() {
 
   useEffect(() => {
     const nextCredits =
-      (user?.publicMetadata?.credits as number | undefined) ?? 100;
+      (user?.unsafeMetadata?.credits as number | undefined) ?? 100;
     setCredits(nextCredits);
   }, [user]);
 
@@ -131,8 +131,8 @@ export default function AppPage() {
       const updatedCredits = Math.max(credits - 100, 0);
       setCredits(updatedCredits);
       await user?.update({
-        publicMetadata: {
-          ...user?.publicMetadata,
+        unsafeMetadata: {
+          ...user?.unsafeMetadata,
           credits: updatedCredits,
         },
       });
