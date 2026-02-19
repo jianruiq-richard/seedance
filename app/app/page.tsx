@@ -58,8 +58,13 @@ export default function AppPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [seed, setSeed] = useState<number>(Date.now());
 
-  const credits =
-    (user?.publicMetadata?.credits as number | undefined) ?? 120;
+  const [credits, setCredits] = useState<number>(100);
+
+  useEffect(() => {
+    const nextCredits =
+      (user?.publicMetadata?.credits as number | undefined) ?? 100;
+    setCredits(nextCredits);
+  }, [user]);
 
   const cleanupUrls = useRef<string[]>([]);
 
@@ -84,6 +89,14 @@ export default function AppPage() {
 
   const handleGenerate = async () => {
     setErrorMessage(null);
+    if (!isSignedIn) {
+      setErrorMessage("Please sign in to generate videos.");
+      return;
+    }
+    if (credits < 100) {
+      setErrorMessage("Not enough credits. Please top up to continue.");
+      return;
+    }
     setStatus("generating");
     setVideoUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -115,6 +128,14 @@ export default function AppPage() {
       setDownloadUrl(url);
       setStatus("ready");
       setSeed(Date.now());
+      const updatedCredits = Math.max(credits - 100, 0);
+      setCredits(updatedCredits);
+      await user?.update({
+        publicMetadata: {
+          ...user?.publicMetadata,
+          credits: updatedCredits,
+        },
+      });
     } catch (error) {
       setStatus("error");
       setErrorMessage(
@@ -134,6 +155,9 @@ export default function AppPage() {
           <div className="flex items-center gap-4 text-sm text-white/70">
             <Link className="hover:text-white" href="/">
               Home
+            </Link>
+            <Link className="hover:text-white" href="/billing">
+              Buy credits
             </Link>
             {isSignedIn ? (
               <>
@@ -295,7 +319,9 @@ export default function AppPage() {
               type="button"
               disabled={status === "generating" || (mode === "image" && !imageFile)}
             >
-              {status === "generating" ? "Generating..." : "Generate"}
+              {status === "generating"
+                ? "Generating..."
+                : "Generate (100 credits)"}
             </button>
 
             {errorMessage && (
