@@ -130,10 +130,22 @@ export default function AppPage() {
       setSeed(Date.now());
       const updatedCredits = Math.max(credits - 100, 0);
       setCredits(updatedCredits);
+      const usageLog =
+        (user?.unsafeMetadata?.creditUsage as
+          | { at: string; amount: number; note?: string }[]
+          | undefined) ?? [];
       await user?.update({
         unsafeMetadata: {
           ...user?.unsafeMetadata,
           credits: updatedCredits,
+          creditUsage: [
+            ...usageLog,
+            {
+              at: new Date().toISOString(),
+              amount: -100,
+              note: `Generate (${mode})`,
+            },
+          ].slice(-50),
         },
       });
     } catch (error) {

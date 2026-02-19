@@ -12,10 +12,11 @@ function isAdminEmail(email: string | null) {
   return list.includes(email.toLowerCase());
 }
 
-export async function updateUserCredits(
+export async function updateUserCreditsWithLog(
   userId: string,
   credits: number,
-  adminEmail: string | null
+  adminEmail: string | null,
+  reason: string
 ) {
   if (!isAdminEmail(adminEmail)) {
     throw new Error("Unauthorized");
@@ -23,10 +24,32 @@ export async function updateUserCredits(
 
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
+  const beforeCredits =
+    (user.unsafeMetadata?.credits as number | undefined) ?? 0;
+  const existingLog =
+    (user.unsafeMetadata?.creditAdjustments as
+      | {
+          at: string;
+          admin: string;
+          before: number;
+          after: number;
+          reason: string;
+        }[]
+      | undefined) ?? [];
   await client.users.updateUserMetadata(userId, {
     unsafeMetadata: {
       ...user.unsafeMetadata,
       credits,
+      creditAdjustments: [
+        ...existingLog,
+        {
+          at: new Date().toISOString(),
+          admin: adminEmail ?? "unknown",
+          before: beforeCredits,
+          after: credits,
+          reason,
+        },
+      ].slice(-50),
     },
   });
 }
