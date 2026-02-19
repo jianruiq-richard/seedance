@@ -156,9 +156,6 @@ export default function AppPage() {
             <Link className="hover:text-white" href="/">
               Home
             </Link>
-            <Link className="hover:text-white" href="/billing">
-              Buy credits
-            </Link>
             {isSignedIn ? (
               <>
                 <div className="hidden items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 md:flex">
