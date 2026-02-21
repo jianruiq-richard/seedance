@@ -1,6 +1,6 @@
 import { SignIn } from "@clerk/nextjs";
 
-export const metadata = { title: "Sign In | Seedance " };
+export const metadata = { title: "Sign In | Seedance" };
 
 export default function Page() {
   return (
