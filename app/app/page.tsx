@@ -50,6 +50,8 @@ export default function AppPage() {
   const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string>("");
+  const [advanced, setAdvanced] = useState<string>("");
   const [status, setStatus] = useState<"idle" | "generating" | "ready" | "error">(
     "idle"
   );
@@ -97,6 +99,10 @@ export default function AppPage() {
       setErrorMessage("Not enough credits. Please top up to continue.");
       return;
     }
+    if (mode === "image" && !imageUrl.trim()) {
+      setErrorMessage("Please provide an image URL for image-to-video.");
+      return;
+    }
     setStatus("generating");
     setVideoUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -113,20 +119,58 @@ export default function AppPage() {
     }
 
     try {
-      const blob = await renderDemoVideo({
-        mode,
-        prompt,
-        image: imageElement,
-        aspect,
-        duration,
-        style,
+      const response = await fetch("/api/seedance", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          mode,
+          prompt,
+          duration,
+          imageUrl: mode === "image" ? imageUrl : null,
+          advanced,
+        }),
       });
+      const data = await response.json();
 
-      const url = URL.createObjectURL(blob);
-      cleanupUrls.current.push(url);
-      setVideoUrl(url);
-      setDownloadUrl(url);
-      setStatus("ready");
+      if (!response.ok) {
+        throw new Error(data?.error || "Generation failed.");
+      }
+
+      let taskStatus = data?.status ?? "queued";
+      let videoUrl = data?.videoUrl ?? null;
+      const taskId = data?.taskId ?? null;
+
+      if (!videoUrl && taskId) {
+        for (let i = 0; i < 30; i += 1) {
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+          const pollResponse = await fetch(
+            `/api/seedance?taskId=${encodeURIComponent(taskId)}`
+          );
+          const pollData = await pollResponse.json();
+          taskStatus = pollData?.status ?? taskStatus;
+          videoUrl = pollData?.videoUrl ?? null;
+
+          if (taskStatus === "succeeded" && videoUrl) {
+            break;
+          }
+          if (taskStatus === "failed") {
+            throw new Error(
+              pollData?.error?.message || "Generation failed."
+            );
+          }
+        }
+      }
+
+      if (videoUrl) {
+        setVideoUrl(videoUrl);
+        setDownloadUrl(videoUrl);
+        setStatus("ready");
+      } else {
+        throw new Error("Generation timed out. Please try again.");
+      }
+
       setSeed(Date.now());
       const updatedCredits = Math.max(credits - 100, 0);
       setCredits(updatedCredits);
@@ -249,6 +293,12 @@ export default function AppPage() {
                     setImageFile(event.target.files?.[0] ?? null)
                   }
                 />
+                <input
+                  className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-white/70 outline-none focus:border-white/40"
+                  placeholder="Image URL for Seedance"
+                  value={imageUrl}
+                  onChange={(event) => setImageUrl(event.target.value)}
+                />
                 {imagePreview && (
                   <img
                     className="h-40 w-full rounded-2xl object-cover"
@@ -275,6 +325,17 @@ export default function AppPage() {
                     </option>
                   ))}
                 </select>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Advanced params
+                </label>
+                <input
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  placeholder="e.g. --camerafixed false --watermark true"
+                  value={advanced}
+                  onChange={(event) => setAdvanced(event.target.value)}
+                />
               </div>
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
@@ -326,7 +387,9 @@ export default function AppPage() {
               className="mt-2 w-full rounded-2xl bg-[#f7c578] px-4 py-3 text-sm font-semibold text-[#0a0b10] transition hover:bg-[#f7c578]/90 disabled:cursor-not-allowed disabled:opacity-60"
               onClick={handleGenerate}
               type="button"
-              disabled={status === "generating" || (mode === "image" && !imageFile)}
+              disabled={
+                status === "generating" || (mode === "image" && !imageUrl.trim())
+              }
             >
               {status === "generating"
                 ? "Generating..."
