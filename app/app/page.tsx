@@ -4,38 +4,31 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { UserButton, useClerk, useUser } from "@clerk/nextjs";
 
-const styles = [
-  "Cinematic Glow",
-  "Neo Noir",
-  "Soft Portrait",
-  "Retro Film",
-  "Studio Product",
-];
-
 const ratios = [
   { label: "16:9", value: "16:9" },
-  { label: "9:16", value: "9:16" },
+  { label: "4:3", value: "4:3" },
   { label: "1:1", value: "1:1" },
+  { label: "3:4", value: "3:4" },
+  { label: "9:16", value: "9:16" },
+  { label: "21:9", value: "21:9" },
+  { label: "Adaptive", value: "adaptive" },
 ];
 
-const durations = [3, 6, 10];
+const durations = [4, 5, 6, 8, 10, 12];
+const resolutions = ["480p", "720p", "1080p"] as const;
 
 type Mode = "text" | "image";
 
-type RenderPayload = {
-  mode: Mode;
-  prompt: string;
-  image?: HTMLImageElement | null;
-  aspect: "16:9" | "9:16" | "1:1";
-  duration: number;
-  style: string;
-};
+type RatioKey = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 
-const ratioSizeMap = {
+const ratioSizeMap: Record<RatioKey, { width: number; height: number }> = {
   "16:9": { width: 960, height: 540 },
   "9:16": { width: 540, height: 960 },
   "1:1": { width: 720, height: 720 },
-} as const;
+  "4:3": { width: 800, height: 600 },
+  "3:4": { width: 600, height: 800 },
+  "21:9": { width: 1260, height: 540 },
+};
 
 export default function AppPage() {
   const { user } = useUser();
@@ -45,20 +38,34 @@ export default function AppPage() {
   const [prompt, setPrompt] = useState(
     "Neon city streets, slow motion, cinematic glow"
   );
-  const [style, setStyle] = useState(styles[0]);
   const [duration, setDuration] = useState<number>(6);
-  const [aspect, setAspect] = useState<"16:9" | "9:16" | "1:1">("16:9");
+  const [ratio, setRatio] = useState<string>("16:9");
+  const [resolution, setResolution] = useState<(typeof resolutions)[number]>(
+    "720p"
+  );
+  const [seed, setSeed] = useState<number>(-1);
+  const [cameraFixed, setCameraFixed] = useState<boolean>(false);
+  const [watermark, setWatermark] = useState<boolean>(false);
+  const [generateAudio, setGenerateAudio] = useState<boolean>(true);
+  const [draft, setDraft] = useState<boolean>(false);
+  const [serviceTier, setServiceTier] = useState<"default" | "flex">(
+    "default"
+  );
+  const [executionExpiresAfter, setExecutionExpiresAfter] =
+    useState<number>(172800);
+  const [returnLastFrame, setReturnLastFrame] = useState<boolean>(false);
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string>("");
-  const [advanced, setAdvanced] = useState<string>("");
+
   const [status, setStatus] = useState<"idle" | "generating" | "ready" | "error">(
     "idle"
   );
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [seed, setSeed] = useState<number>(Date.now());
+  const [seedKey, setSeedKey] = useState<number>(Date.now());
 
   const [credits, setCredits] = useState<number>(100);
 
@@ -70,7 +77,10 @@ export default function AppPage() {
 
   const cleanupUrls = useRef<string[]>([]);
 
-  const aspectSize = useMemo(() => ratioSizeMap[aspect], [aspect]);
+  const aspectSize = useMemo(() => {
+    const normalized = ratio as RatioKey;
+    return ratioSizeMap[normalized] ?? ratioSizeMap["16:9"];
+  }, [ratio]);
 
   useEffect(() => {
     return () => {
@@ -113,11 +123,6 @@ export default function AppPage() {
       return null;
     });
 
-    let imageElement: HTMLImageElement | null = null;
-    if (mode === "image" && imagePreview) {
-      imageElement = await loadImage(imagePreview);
-    }
-
     try {
       const response = await fetch("/api/seedance", {
         method: "POST",
@@ -127,9 +132,18 @@ export default function AppPage() {
         body: JSON.stringify({
           mode,
           prompt,
-          duration,
           imageUrl: mode === "image" ? imageUrl : null,
-          advanced,
+          ratio,
+          resolution,
+          duration,
+          seed,
+          camera_fixed: cameraFixed,
+          watermark,
+          generate_audio: generateAudio,
+          draft,
+          service_tier: serviceTier,
+          execution_expires_after: executionExpiresAfter,
+          return_last_frame: returnLastFrame,
         }),
       });
       const data = await response.json();
@@ -139,39 +153,37 @@ export default function AppPage() {
       }
 
       let taskStatus = data?.status ?? "queued";
-      let videoUrl = data?.videoUrl ?? null;
+      let outputUrl = data?.videoUrl ?? null;
       const taskId = data?.taskId ?? null;
 
-      if (!videoUrl && taskId) {
-        for (let i = 0; i < 30; i += 1) {
+      if (!outputUrl && taskId) {
+        for (let i = 0; i < 40; i += 1) {
           await new Promise((resolve) => setTimeout(resolve, 3000));
           const pollResponse = await fetch(
             `/api/seedance?taskId=${encodeURIComponent(taskId)}`
           );
           const pollData = await pollResponse.json();
           taskStatus = pollData?.status ?? taskStatus;
-          videoUrl = pollData?.videoUrl ?? null;
+          outputUrl = pollData?.videoUrl ?? null;
 
-          if (taskStatus === "succeeded" && videoUrl) {
+          if (taskStatus === "succeeded" && outputUrl) {
             break;
           }
           if (taskStatus === "failed") {
-            throw new Error(
-              pollData?.error?.message || "Generation failed."
-            );
+            throw new Error(pollData?.error?.message || "Generation failed.");
           }
         }
       }
 
-      if (videoUrl) {
-        setVideoUrl(videoUrl);
-        setDownloadUrl(videoUrl);
+      if (outputUrl) {
+        setVideoUrl(outputUrl);
+        setDownloadUrl(outputUrl);
         setStatus("ready");
       } else {
         throw new Error("Generation timed out. Please try again.");
       }
 
-      setSeed(Date.now());
+      setSeedKey(Date.now());
       const updatedCredits = Math.max(credits - 100, 0);
       setCredits(updatedCredits);
       const usageLog =
@@ -283,7 +295,7 @@ export default function AppPage() {
             {mode === "image" && (
               <div className="space-y-3">
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
-                  Upload image
+                  Upload image (preview only)
                 </label>
                 <input
                   className="w-full rounded-2xl border border-dashed border-white/20 bg-black/20 px-4 py-3 text-xs text-white/70"
@@ -312,14 +324,16 @@ export default function AppPage() {
             <div className="grid gap-4">
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
-                  Style
+                  Resolution
                 </label>
                 <select
                   className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
-                  value={style}
-                  onChange={(event) => setStyle(event.target.value)}
+                  value={resolution}
+                  onChange={(event) =>
+                    setResolution(event.target.value as typeof resolution)
+                  }
                 >
-                  {styles.map((item) => (
+                  {resolutions.map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
@@ -328,43 +342,30 @@ export default function AppPage() {
               </div>
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
-                  Advanced params
-                </label>
-                <input
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
-                  placeholder="e.g. --camerafixed false --watermark true"
-                  value={advanced}
-                  onChange={(event) => setAdvanced(event.target.value)}
-                />
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
-                  Aspect ratio
+                  Ratio
                 </label>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  {ratios.map((ratio) => (
+                  {ratios.map((item) => (
                     <button
-                      key={ratio.value}
+                      key={item.value}
                       className={`rounded-full border px-4 py-2 text-xs transition ${
-                        aspect === ratio.value
+                        ratio === item.value
                           ? "border-white bg-white text-[#0a0b10]"
                           : "border-white/20 text-white/70"
                       }`}
-                      onClick={() =>
-                        setAspect(ratio.value as "16:9" | "9:16" | "1:1")
-                      }
+                      onClick={() => setRatio(item.value)}
                       type="button"
                     >
-                      {ratio.label}
+                      {item.label}
                     </button>
                   ))}
                 </div>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
-                  Duration
+                  Duration (seconds)
                 </label>
-                <div className="mt-2 flex gap-2">
+                <div className="mt-2 flex flex-wrap gap-2">
                   {durations.map((item) => (
                     <button
                       key={item}
@@ -380,6 +381,91 @@ export default function AppPage() {
                     </button>
                   ))}
                 </div>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Seed (-1 for random)
+                </label>
+                <input
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  type="number"
+                  value={seed}
+                  onChange={(event) => setSeed(Number(event.target.value))}
+                />
+              </div>
+              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-xs text-white/70">
+                <label className="flex items-center justify-between gap-2">
+                  Camera fixed
+                  <input
+                    type="checkbox"
+                    checked={cameraFixed}
+                    onChange={(event) => setCameraFixed(event.target.checked)}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  Watermark
+                  <input
+                    type="checkbox"
+                    checked={watermark}
+                    onChange={(event) => setWatermark(event.target.checked)}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  Generate audio
+                  <input
+                    type="checkbox"
+                    checked={generateAudio}
+                    onChange={(event) => setGenerateAudio(event.target.checked)}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  Draft mode
+                  <input
+                    type="checkbox"
+                    checked={draft}
+                    onChange={(event) => setDraft(event.target.checked)}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  Return last frame
+                  <input
+                    type="checkbox"
+                    checked={returnLastFrame}
+                    onChange={(event) =>
+                      setReturnLastFrame(event.target.checked)
+                    }
+                  />
+                </label>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Service tier
+                </label>
+                <select
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  value={serviceTier}
+                  onChange={(event) =>
+                    setServiceTier(event.target.value as "default" | "flex")
+                  }
+                >
+                  <option value="default">default</option>
+                  <option value="flex">flex</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Execution expires after (seconds)
+                </label>
+                <input
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  type="number"
+                  min={3600}
+                  max={259200}
+                  value={executionExpiresAfter}
+                  onChange={(event) =>
+                    setExecutionExpiresAfter(Number(event.target.value))
+                  }
+                />
               </div>
             </div>
 
@@ -416,7 +502,7 @@ export default function AppPage() {
             >
               {videoUrl ? (
                 <video
-                  key={seed}
+                  key={seedKey}
                   className="max-h-[360px] w-full rounded-2xl bg-black/40"
                   src={videoUrl}
                   controls
@@ -430,14 +516,14 @@ export default function AppPage() {
             </div>
             <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-white/60">
               <div className="flex gap-3">
-                <span>Size: {aspect}</span>
+                <span>Ratio: {ratio}</span>
                 <span>Duration: {duration}s</span>
               </div>
               {downloadUrl && (
                 <a
                   className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0a0b10]"
                   href={downloadUrl}
-                  download={`seedance-${mode}-${aspect}.webm`}
+                  download={`seedance-${mode}-${ratio}.mp4`}
                 >
                   Download video
                 </a>
@@ -461,7 +547,7 @@ export default function AppPage() {
               </div>
               <p className="mt-2 text-xs text-white/50">{prompt}</p>
               <div className="mt-3 text-xs text-white/40">
-                {style} · {aspect} · {duration}s
+                {resolution} · {ratio} · {duration}s
               </div>
             </div>
           </div>
@@ -469,122 +555,4 @@ export default function AppPage() {
       </div>
     </div>
   );
-}
-
-async function renderDemoVideo(payload: RenderPayload): Promise<Blob> {
-  const { width, height } = ratioSizeMap[payload.aspect];
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const context = canvas.getContext("2d");
-
-  if (!context) {
-    throw new Error("Canvas recording is not supported.");
-  }
-
-  const stream = canvas.captureStream(30);
-  const mimeType = pickMimeType();
-  const recorder = new MediaRecorder(stream, { mimeType });
-  const chunks: BlobPart[] = [];
-
-  recorder.ondataavailable = (event) => {
-    if (event.data && event.data.size > 0) {
-      chunks.push(event.data);
-    }
-  };
-
-  const totalMs = payload.duration * 1000;
-  const start = performance.now();
-  recorder.start();
-
-  await new Promise<void>((resolve) => {
-    const frame = (now: number) => {
-      const elapsed = now - start;
-      const progress = Math.min(elapsed / totalMs, 1);
-      drawFrame(context, payload, width, height, progress);
-      if (elapsed < totalMs) {
-        requestAnimationFrame(frame);
-      } else {
-        resolve();
-      }
-    };
-    requestAnimationFrame(frame);
-  });
-
-  recorder.stop();
-
-  await new Promise<void>((resolve) => {
-    recorder.onstop = () => resolve();
-  });
-
-  return new Blob(chunks, { type: mimeType });
-}
-
-function drawFrame(
-  context: CanvasRenderingContext2D,
-  payload: RenderPayload,
-  width: number,
-  height: number,
-  progress: number
-) {
-  const hueShift = Math.floor(progress * 160);
-  const gradient = context.createLinearGradient(0, 0, width, height);
-  gradient.addColorStop(0, `hsl(${28 + hueShift}, 70%, 55%)`);
-  gradient.addColorStop(1, `hsl(${210 + hueShift}, 70%, 45%)`);
-  context.fillStyle = gradient;
-  context.fillRect(0, 0, width, height);
-
-  context.fillStyle = "rgba(7, 8, 12, 0.35)";
-  context.fillRect(0, 0, width, height);
-
-  if (payload.mode === "image" && payload.image) {
-    const zoom = 1.05 + progress * 0.1;
-    const imgWidth = payload.image.width * zoom;
-    const imgHeight = payload.image.height * zoom;
-    const scale = Math.max(width / imgWidth, height / imgHeight);
-    const drawWidth = imgWidth * scale;
-    const drawHeight = imgHeight * scale;
-    const dx = (width - drawWidth) / 2;
-    const dy = (height - drawHeight) / 2;
-    context.drawImage(payload.image, dx, dy, drawWidth, drawHeight);
-  }
-
-  context.fillStyle = "rgba(255, 255, 255, 0.05)";
-  for (let i = 0; i < 50; i += 1) {
-    const x = (i * 37 + progress * 200) % width;
-    const y = (i * 53 + progress * 120) % height;
-    context.fillRect(x, y, 2, 2);
-  }
-
-  context.fillStyle = "rgba(0, 0, 0, 0.4)";
-  context.fillRect(32, height - 120, width - 64, 80);
-
-  context.fillStyle = "rgba(255, 255, 255, 0.85)";
-  context.font = "20px 'Geist', system-ui, sans-serif";
-  context.fillText(payload.prompt.slice(0, 48), 52, height - 75);
-
-  context.fillStyle = "rgba(255, 255, 255, 0.6)";
-  context.font = "14px 'Geist', system-ui, sans-serif";
-  context.fillText(`${payload.style} · ${payload.aspect}`, 52, height - 50);
-}
-
-function pickMimeType() {
-  const candidates = [
-    "video/webm;codecs=vp9",
-    "video/webm;codecs=vp8",
-    "video/webm",
-  ];
-  return (
-    candidates.find((type) => MediaRecorder.isTypeSupported(type)) ||
-    "video/webm"
-  );
-}
-
-function loadImage(url: string) {
-  return new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("Image failed to load."));
-    img.src = url;
-  });
 }

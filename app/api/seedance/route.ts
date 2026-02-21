@@ -11,8 +11,18 @@ type GenerateRequest = {
   mode: "text" | "image";
   prompt: string;
   imageUrl?: string | null;
-  duration: number;
-  advanced?: string;
+  ratio?: string;
+  resolution?: string;
+  duration?: number;
+  frames?: number;
+  seed?: number;
+  camera_fixed?: boolean;
+  watermark?: boolean;
+  generate_audio?: boolean;
+  draft?: boolean;
+  service_tier?: "default" | "flex";
+  execution_expires_after?: number;
+  return_last_frame?: boolean;
 };
 
 function requireConfig() {
@@ -29,11 +39,6 @@ function getBaseUrl() {
     return raw;
   }
   return `${raw}/api/v3`;
-}
-
-function buildText(prompt: string, duration: number, advanced?: string) {
-  const suffix = advanced?.trim() ? ` ${advanced.trim()}` : "";
-  return `${prompt} --duration ${duration}${suffix}`.trim();
 }
 
 export async function POST(request: Request) {
@@ -55,7 +60,7 @@ export async function POST(request: Request) {
   const content: Array<Record<string, unknown>> = [
     {
       type: "text",
-      text: buildText(body.prompt, body.duration, body.advanced),
+      text: body.prompt,
     },
   ];
 
@@ -84,6 +89,18 @@ export async function POST(request: Request) {
     body: JSON.stringify({
       model,
       content,
+      ratio: body.ratio,
+      resolution: body.resolution,
+      duration: body.duration,
+      frames: body.frames,
+      seed: body.seed,
+      camera_fixed: body.camera_fixed,
+      watermark: body.watermark,
+      generate_audio: body.generate_audio,
+      draft: body.draft,
+      service_tier: body.service_tier,
+      execution_expires_after: body.execution_expires_after,
+      return_last_frame: body.return_last_frame,
     }),
   });
 
