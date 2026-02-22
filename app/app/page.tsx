@@ -30,6 +30,71 @@ const ratioSizeMap: Record<RatioKey, { width: number; height: number }> = {
   "21:9": { width: 1260, height: 540 },
 };
 
+const DEFAULT_FPS = 24;
+const PRICE_OVER_COST = 2;
+const DEFAULT_PRICE_WITH_AUDIO = 16 * PRICE_OVER_COST;
+const DEFAULT_PRICE_WITHOUT_AUDIO = 8 * PRICE_OVER_COST;
+const CREDITS_PER_USD = 1000;
+const USD_CNY_RATE = 7.2;
+
+const pricingResolutionMap = {
+  "480p": {
+    "16:9": [864, 496],
+    "4:3": [752, 560],
+    "1:1": [640, 640],
+    "3:4": [560, 752],
+    "9:16": [496, 864],
+    "21:9": [992, 432],
+  },
+  "720p": {
+    "16:9": [1280, 720],
+    "4:3": [1112, 834],
+    "1:1": [960, 960],
+    "3:4": [834, 1112],
+    "9:16": [720, 1280],
+    "21:9": [1470, 630],
+  },
+  "1080p": {
+    "16:9": [1920, 1080],
+    "4:3": [1664, 1248],
+    "1:1": [1440, 1440],
+    "3:4": [1248, 1664],
+    "9:16": [1080, 1920],
+    "21:9": [2206, 946],
+  },
+} satisfies Record<string, Record<RatioKey, [number, number]>>;
+
+function calculateVideoPrice(
+  resolutionLabel: (typeof resolutions)[number],
+  aspectRatio: string,
+  durationSeconds: number,
+  hasAudio: boolean,
+  fps = DEFAULT_FPS
+) {
+  if (aspectRatio === "adaptive") {
+    aspectRatio = "16:9";
+  }
+  const ratioMap = pricingResolutionMap[resolutionLabel];
+  if (!ratioMap) {
+    return { error: `Unsupported resolution: ${resolutionLabel}` };
+  }
+  if (!Object.prototype.hasOwnProperty.call(ratioMap, aspectRatio)) {
+    return { error: `Unsupported ratio for ${resolutionLabel}: ${aspectRatio}` };
+  }
+  const [width, height] = ratioMap[aspectRatio as RatioKey];
+  const totalTokens = (width * height * fps * durationSeconds) / 1024;
+  const unitPrice = hasAudio
+    ? DEFAULT_PRICE_WITH_AUDIO
+    : DEFAULT_PRICE_WITHOUT_AUDIO;
+  const totalPrice = totalTokens * (unitPrice / 1_000_000);
+
+  return {
+    totalTokens,
+    unitPrice,
+    totalPrice,
+  };
+};
+
 export default function AppPage() {
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -71,6 +136,9 @@ export default function AppPage() {
   const [seedKey, setSeedKey] = useState<number>(Date.now());
 
   const [credits, setCredits] = useState<number>(100);
+  const [pricingCredits, setPricingCredits] = useState<number>(100);
+  const [pricingError, setPricingError] = useState<string | null>(null);
+  const [pricingLoading, setPricingLoading] = useState<boolean>(false);
 
   useEffect(() => {
     const nextCredits =
@@ -84,6 +152,32 @@ export default function AppPage() {
     const normalized = ratio as RatioKey;
     return ratioSizeMap[normalized] ?? ratioSizeMap["16:9"];
   }, [ratio]);
+
+  useEffect(() => {
+    setPricingLoading(true);
+    setPricingError(null);
+    const handle = setTimeout(() => {
+      const result = calculateVideoPrice(
+        resolution,
+        ratio,
+        duration,
+        generateAudio
+      );
+      if ("error" in result) {
+        setPricingError(result.error);
+        setPricingCredits(0);
+        setPricingLoading(false);
+        return;
+      }
+      const creditsNeeded = Math.max(
+        1,
+        Math.ceil((result.totalPrice / USD_CNY_RATE) * CREDITS_PER_USD)
+      );
+      setPricingCredits(creditsNeeded);
+      setPricingLoading(false);
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [resolution, ratio, duration, generateAudio]);
 
   useEffect(() => {
     return () => {
@@ -172,7 +266,15 @@ export default function AppPage() {
       setErrorMessage("Please sign in to generate videos.");
       return;
     }
-    if (credits < 100) {
+    if (pricingLoading) {
+      setErrorMessage("Calculating price. Please wait.");
+      return;
+    }
+    if (pricingError) {
+      setErrorMessage(pricingError);
+      return;
+    }
+    if (credits < pricingCredits) {
       setErrorMessage("Not enough credits. Please top up to continue.");
       return;
     }
@@ -251,7 +353,7 @@ export default function AppPage() {
       }
 
       setSeedKey(Date.now());
-      const updatedCredits = Math.max(credits - 100, 0);
+      const updatedCredits = Math.max(credits - pricingCredits, 0);
       setCredits(updatedCredits);
       const usageLog =
         (user?.unsafeMetadata?.creditUsage as
@@ -580,14 +682,27 @@ export default function AppPage() {
               onClick={handleGenerate}
               type="button"
               disabled={
-                status === "generating" || (mode === "image" && !imageUrl.trim())
+                status === "generating" ||
+                pricingLoading ||
+                Boolean(pricingError) ||
+                (mode === "image" && !imageUrl.trim())
               }
             >
-              {status === "generating"
-                ? "Generating..."
-                : "Generate (100 credits)"}
+              {status === "generating" ? (
+                "Generating..."
+              ) : pricingLoading ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0a0b10] border-t-transparent" />
+                  Calculating...
+                </span>
+              ) : (
+                `Generate (${pricingCredits} credits)`
+              )}
             </button>
 
+            {pricingError && (
+              <p className="text-xs text-rose-200">{pricingError}</p>
+            )}
             {errorMessage && (
               <p className="text-xs text-rose-200">{errorMessage}</p>
             )}
