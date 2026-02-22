@@ -58,6 +58,9 @@ export default function AppPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string>("");
+  const [uploading, setUploading] = useState<boolean>(false);
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [dragActive, setDragActive] = useState<boolean>(false);
 
   const [status, setStatus] = useState<"idle" | "generating" | "ready" | "error">(
     "idle"
@@ -98,6 +101,70 @@ export default function AppPage() {
     cleanupUrls.current.push(nextUrl);
     setImagePreview(nextUrl);
   }, [imageFile]);
+
+  useEffect(() => {
+    if (!imageFile) return;
+    void handleUpload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [imageFile]);
+
+  const handleUpload = async () => {
+    if (!imageFile) return;
+    setUploading(true);
+    setUploadProgress(0);
+    setErrorMessage(null);
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/tos/upload", true);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.round((event.loaded / event.total) * 100);
+            setUploadProgress(percent);
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const data = JSON.parse(xhr.responseText);
+              if (data?.url) {
+                setImageUrl(data.url);
+                resolve();
+              } else {
+                reject(new Error("Upload failed."));
+              }
+            } catch (error) {
+              reject(new Error("Upload failed."));
+            }
+          } else {
+            const detail = xhr.responseText?.slice(0, 500) || "";
+            reject(
+              new Error(
+                `Upload failed (${xhr.status}). ${detail ? `Detail: ${detail}` : ""}`
+              )
+            );
+          }
+        };
+        xhr.onerror = () => {
+          const detail = xhr.responseText?.slice(0, 500) || "";
+          reject(
+            new Error(
+              `Upload failed. ${detail ? `Detail: ${detail}` : ""}`
+            )
+          );
+        };
+        const formData = new FormData();
+        formData.append("file", imageFile);
+        xhr.send(formData);
+      });
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : "Upload failed."
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleGenerate = async () => {
     setErrorMessage(null);
@@ -295,28 +362,67 @@ export default function AppPage() {
             {mode === "image" && (
               <div className="space-y-3">
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
-                  Upload image (preview only)
+                  Upload image
                 </label>
-                <input
-                  className="w-full rounded-2xl border border-dashed border-white/20 bg-black/20 px-4 py-3 text-xs text-white/70"
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) =>
-                    setImageFile(event.target.files?.[0] ?? null)
-                  }
-                />
-                <input
-                  className="w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-white/70 outline-none focus:border-white/40"
-                  placeholder="Image URL for Seedance"
-                  value={imageUrl}
-                  onChange={(event) => setImageUrl(event.target.value)}
-                />
-                {imagePreview && (
-                  <img
-                    className="h-40 w-full rounded-2xl object-cover"
-                    src={imagePreview}
-                    alt="Preview"
+                <label
+                  className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-center text-xs transition ${
+                    dragActive
+                      ? "border-white/80 bg-white/5 text-white"
+                      : "border-white/20 bg-black/20 text-white/60 hover:border-white/50"
+                  }`}
+                  onDragOver={(event) => {
+                    event.preventDefault();
+                    setDragActive(true);
+                  }}
+                  onDragLeave={(event) => {
+                    event.preventDefault();
+                    setDragActive(false);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragActive(false);
+                    const file = event.dataTransfer.files?.[0] ?? null;
+                    if (file) {
+                      setImageFile(file);
+                    }
+                  }}
+                >
+                  <input
+                    className="hidden"
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) =>
+                      setImageFile(event.target.files?.[0] ?? null)
+                    }
                   />
+                  <span>Drag & drop or click to upload</span>
+                  {imageFile && (
+                    <span className="text-white/80">{imageFile.name}</span>
+                  )}
+                </label>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full rounded-full bg-[#f7c578] transition-all"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                {uploadProgress > 0 && uploadProgress < 100 && (
+                  <p className="text-xs text-white/60">
+                    Uploading... {uploadProgress}%
+                  </p>
+                )}
+                {imagePreview && (
+                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                    <img
+                      className="h-16 w-16 rounded-xl object-cover"
+                      src={imagePreview}
+                      alt="Preview"
+                    />
+                    <div className="text-xs text-white/70">
+                      <p className="font-semibold text-white/90">Preview</p>
+                      <p className="mt-1 break-all">{imageFile?.name}</p>
+                    </div>
+                  </div>
                 )}
               </div>
             )}
