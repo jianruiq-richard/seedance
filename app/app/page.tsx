@@ -64,13 +64,23 @@ const pricingResolutionMap = {
   },
 } satisfies Record<string, Record<RatioKey, [number, number]>>;
 
+type PriceResult =
+  | {
+      totalTokens: number;
+      unitPrice: number;
+      totalPrice: number;
+    }
+  | {
+      error: string;
+    };
+
 function calculateVideoPrice(
   resolutionLabel: (typeof resolutions)[number],
   aspectRatio: string,
   durationSeconds: number,
   hasAudio: boolean,
   fps = DEFAULT_FPS
-) {
+): PriceResult {
   if (aspectRatio === "adaptive") {
     aspectRatio = "16:9";
   }
@@ -93,7 +103,7 @@ function calculateVideoPrice(
     unitPrice,
     totalPrice,
   };
-};
+}
 
 export default function AppPage() {
   const { user } = useUser();
