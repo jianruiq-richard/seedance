@@ -270,6 +270,14 @@ export default function AppPage() {
     }
   };
 
+  const handleRemoveImage = () => {
+    setImageFile(null);
+    setImagePreview(null);
+    setImageUrl("");
+    setUploadProgress(0);
+    setErrorMessage(null);
+  };
+
   const handleGenerate = async () => {
     setErrorMessage(null);
     if (!isSignedIn) {
@@ -524,16 +532,23 @@ export default function AppPage() {
                   </p>
                 )}
                 {imagePreview && (
-                  <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-black/20 p-3">
+                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 p-3">
                     <img
                       className="h-16 w-16 rounded-xl object-cover"
                       src={imagePreview}
                       alt="Preview"
                     />
-                    <div className="text-xs text-white/70">
+                    <div className="flex-1 text-xs text-white/70">
                       <p className="font-semibold text-white/90">Preview</p>
                       <p className="mt-1 break-all">{imageFile?.name}</p>
                     </div>
+                    <button
+                      className="rounded-full border border-white/20 px-3 py-1 text-[11px] text-white/80 transition hover:border-white/60 hover:text-white"
+                      type="button"
+                      onClick={handleRemoveImage}
+                    >
+                      Remove
+                    </button>
                   </div>
                 )}
               </div>
