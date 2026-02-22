@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import crypto from "crypto";
-import { TosClient, TosClientError, TosServerError } from "@volcengine/tos-sdk";
+import { TosClient, TosClientError, TosServerError, ACLType } from "@volcengine/tos-sdk";
 
 export const runtime = "nodejs";
 
@@ -66,7 +66,7 @@ export async function POST(request: Request) {
       key,
       body: buffer,
       contentType,
-      acl: "public-read",
+      acl: ACLType.ACLPublicRead,
     });
   } catch (error) {
     if (error instanceof TosClientError) {
