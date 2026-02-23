@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { UserButton, useClerk, useUser } from "@clerk/nextjs";
-import PayPalCheckout from "@/app/components/PayPalCheckout";
 
 const ratios = [
   { label: "16:9", value: "16:9" },
@@ -420,6 +419,12 @@ export default function AppPage() {
                   <span className="text-white/60">Credits</span>
                   <span className="font-semibold text-white">{credits}</span>
                 </div>
+                <Link
+                  className="rounded-full bg-[#f7c578] px-4 py-2 text-xs font-semibold text-[#0a0b10] transition hover:bg-[#f7c578]/90"
+                  href="/billing"
+                >
+                  Purchase credits
+                </Link>
                 <div className="flex items-center gap-2">
                   <UserButton
                     appearance={{
@@ -738,10 +743,6 @@ export default function AppPage() {
         </section>
 
         <section className="space-y-6">
-          <PayPalCheckout
-            disabled={!isSignedIn}
-            onCreditsUpdated={(nextCredits) => setCredits(nextCredits)}
-          />
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <div className="flex items-center justify-between text-xs text-white/60">
               <span>Preview</span>
