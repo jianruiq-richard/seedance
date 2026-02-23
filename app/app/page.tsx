@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { UserButton, useClerk, useUser } from "@clerk/nextjs";
+import PayPalCheckout from "@/app/components/PayPalCheckout";
 
 const ratios = [
   { label: "16:9", value: "16:9" },
@@ -144,6 +145,7 @@ export default function AppPage() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [seedKey, setSeedKey] = useState<number>(Date.now());
+  const [lastGeneratedAt, setLastGeneratedAt] = useState<string>("");
 
   const [credits, setCredits] = useState<number>(100);
   const [pricingCredits, setPricingCredits] = useState<number>(100);
@@ -366,6 +368,7 @@ export default function AppPage() {
         setVideoUrl(outputUrl);
         setDownloadUrl(outputUrl);
         setStatus("ready");
+        setLastGeneratedAt(new Date().toLocaleString());
       } else {
         throw new Error("Generation timed out. Please try again.");
       }
@@ -735,6 +738,10 @@ export default function AppPage() {
         </section>
 
         <section className="space-y-6">
+          <PayPalCheckout
+            disabled={!isSignedIn}
+            onCreditsUpdated={(nextCredits) => setCredits(nextCredits)}
+          />
           <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
             <div className="flex items-center justify-between text-xs text-white/60">
               <span>Preview</span>
@@ -787,9 +794,9 @@ export default function AppPage() {
                 <span className="text-white">
                   {mode === "text" ? "Text to Video" : "Image to Video"}
                 </span>
-                <span className="text-xs text-white/40">
-                  {new Date().toLocaleString()}
-                </span>
+              <span className="text-xs text-white/40">
+                {lastGeneratedAt || "—"}
+              </span>
               </div>
               <p className="mt-2 text-xs text-white/50">{prompt}</p>
               <div className="mt-3 text-xs text-white/40">
