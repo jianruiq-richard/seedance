@@ -286,7 +286,7 @@ export default function AppPage() {
       return;
     }
     if (pricingLoading) {
-      setErrorMessage("Calculating price. Please wait. ");
+      setErrorMessage("Calculating price. Please wait.");
       return;
     }
     if (pricingError) {
