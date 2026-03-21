@@ -423,7 +423,7 @@ export default function AppPage() {
                   className="rounded-full bg-[#f7c578] px-4 py-2 text-xs font-semibold text-[#0a0b10] transition hover:bg-[#f7c578]/90"
                   href="/billing"
                 >
-                  Purchase credits
+                  Subscribe
                 </Link>
                 <div className="flex items-center gap-2">
                   <UserButton
