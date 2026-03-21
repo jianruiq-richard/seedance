@@ -42,8 +42,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      cancelAt: updatedSubscription.cancel_at,
-      currentPeriodEnd: updatedSubscription.current_period_end,
+      cancelAt: (updatedSubscription as any).cancel_at,
+      currentPeriodEnd: (updatedSubscription as any).current_period_end,
     });
   } catch (error) {
     console.error("Stripe cancel subscription error:", error);
