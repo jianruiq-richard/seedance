@@ -6,13 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate-samples": "node scripts/generate-samples.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.5",
     "@stripe/stripe-js": "^4.10.0",
     "@vercel/analytics": "^1.6.1",
     "@volcengine/tos-sdk": "^2.9.0",
+    "dotenv": "^17.3.1",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
