@@ -150,12 +150,26 @@ export default function AppPage() {
   const [pricingCredits, setPricingCredits] = useState<number>(100);
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [pricingLoading, setPricingLoading] = useState<boolean>(false);
+  const [subscriptionSuccess, setSubscriptionSuccess] = useState<boolean>(false);
 
   useEffect(() => {
     const nextCredits =
       (user?.unsafeMetadata?.credits as number | undefined) ?? 100;
     setCredits(nextCredits);
   }, [user]);
+
+  // Check for subscription success from URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('subscription') === 'success') {
+      setSubscriptionSuccess(true);
+      // Clear URL parameters after 3 seconds
+      setTimeout(() => {
+        setSubscriptionSuccess(false);
+        window.history.replaceState({}, '', '/app');
+      }, 5000);
+    }
+  }, []);
 
   const cleanupUrls = useRef<string[]>([]);
 
@@ -453,6 +467,23 @@ export default function AppPage() {
           </div>
         </div>
       </div>
+
+      {/* Subscription Success Banner */}
+      {subscriptionSuccess && (
+        <div className="mx-auto w-full max-w-6xl px-6 pt-4">
+          <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-center">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-2xl">🎉</span>
+              <h3 className="text-lg font-semibold text-green-400">
+                Subscription Successful!
+              </h3>
+            </div>
+            <p className="mt-2 text-sm text-green-300/80">
+              Your credits have been updated. You can now start creating amazing videos!
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[360px_1fr]">
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">

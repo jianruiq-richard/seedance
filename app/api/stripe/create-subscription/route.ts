@@ -49,8 +49,8 @@ export async function POST(request: Request) {
           quantity: 1,
         },
       ],
-      success_url: `${process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://your-domain.com'}/billing?success=true&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://your-domain.com'}/billing?canceled=true`,
+      success_url: `${process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.seedance.technology'}/app?subscription=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${process.env.NODE_ENV === 'development' ? 'http://localhost:3000' : 'https://www.seedance.technology'}/billing?canceled=true`,
       metadata: {
         clerk_user_id: userId,
         plan_id: plan.id,
