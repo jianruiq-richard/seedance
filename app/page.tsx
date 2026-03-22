@@ -1,4 +1,5 @@
 import Link from "next/link";
+import SampleVideoPreview from "./components/SampleVideoPreview";
 
 const highlights = [
   {
@@ -84,21 +85,7 @@ export default function Home() {
               <span>Preview</span>
               <span className="rounded-full border border-white/20 px-2 py-1">Live</span>
             </div>
-            <div className="mt-4 h-64 rounded-2xl border border-dashed border-white/15 bg-[linear-gradient(120deg,_rgba(255,255,255,0.06),_rgba(255,255,255,0.01))]" />
-            <div className="mt-5 grid gap-3 text-sm text-white/70">
-              <div className="flex items-center justify-between">
-                <span>Prompt</span>
-                <span className="text-white/40">Neon city in slow motion</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Style</span>
-                <span className="text-white/40">Cinematic Glow</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Duration</span>
-                <span className="text-white/40">6 seconds</span>
-              </div>
-            </div>
+            <SampleVideoPreview />
           </div>
         </section>
 
