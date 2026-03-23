@@ -1,0 +1,11 @@
+{
+  "samples": [
+    {
+      "id": "preview-sample",
+      "title": "AI Generated Sample",
+      "description": "Professional AI video generation showcase",
+      "videoUrl": "/samples/dark_barbie_compressed.mp4",
+      "thumbnailUrl": "/samples/dark_barbie_compressed.mp4"
+    }
+  ]
+}
