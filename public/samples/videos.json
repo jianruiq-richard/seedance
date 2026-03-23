@@ -1,11 +1,12 @@
-{
-  "samples": [
-    {
-      "id": "preview-sample",
-      "title": "AI Generated Sample",
-      "description": "Professional AI video generation showcase",
-      "videoUrl": "/samples/dark_barbie_compressed.mp4",
-      "thumbnailUrl": "/samples/dark_barbie_compressed.mp4"
-    }
-  ]
-}
+[
+  {
+    "id": "preview-sample",
+    "title": "AI Generated Sample Video",
+    "style": "Professional Showcase",
+    "duration": "3 minutes",
+    "description": "High-quality AI video generation demo",
+    "videoUrl": "/samples/dark_barbie_compressed.mp4",
+    "gradient": "from-pink-600/25 via-purple-500/20 to-cyan-400/15",
+    "icon": "🎬"
+  }
+]
