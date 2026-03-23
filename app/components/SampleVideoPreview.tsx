@@ -52,6 +52,7 @@ export default function SampleVideoPreview() {
   const [currentVideo, setCurrentVideo] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isMuted, setIsMuted] = useState(true); // 默认静音，用户可以手动开启
 
   const current = sampleVideos[currentVideo];
 
@@ -130,12 +131,12 @@ export default function SampleVideoPreview() {
             className="w-full h-full object-cover"
             autoPlay
             loop
-            muted
+            muted={isMuted}
             onLoadedData={() => console.log('Video loaded:', current.title)}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}
             onEnded={() => setIsPlaying(false)}
-            controls={false}
+            controls={true}
           >
             <source src={current.videoUrl} type="video/mp4" />
           </video>
@@ -223,12 +224,22 @@ export default function SampleVideoPreview() {
 
         {/* Video controls overlay */}
         {current.videoUrl && isPlaying && (
-          <button
-            onClick={handlePause}
-            className="absolute top-4 right-4 rounded-full bg-black/50 backdrop-blur p-2 text-white/80 transition hover:bg-black/70"
-          >
-            ⏸
-          </button>
+          <div className="absolute top-4 right-4 flex gap-2">
+            <button
+              onClick={() => setIsMuted(!isMuted)}
+              className="rounded-full bg-black/50 backdrop-blur p-2 text-white/80 transition hover:bg-black/70"
+              title={isMuted ? "开启声音" : "静音"}
+            >
+              {isMuted ? "🔇" : "🔊"}
+            </button>
+            <button
+              onClick={handlePause}
+              className="rounded-full bg-black/50 backdrop-blur p-2 text-white/80 transition hover:bg-black/70"
+              title="暂停"
+            >
+              ⏸
+            </button>
+          </div>
         )}
       </div>
 
