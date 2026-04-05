@@ -88,7 +88,7 @@ async function handleSubscriptionUpdate(subscription: any) {
     if (!plan) return;
 
     // 获取当前积分，然后增加（无论首次还是续费都叠加积分）
-    const currentCredits = (user.unsafeMetadata?.credits as number) || 100;
+    const currentCredits = (user.unsafeMetadata?.credits as number) || 600;
 
     // 总是叠加积分，不覆盖现有积分
     const newCredits = currentCredits + plan.credits;
@@ -123,7 +123,7 @@ async function handleSubscriptionDeleted(subscription: any) {
       unsafeMetadata: {
         subscriptionStatus: "canceled",
         currentPlan: null,
-        credits: 100, // Reset to free tier credits
+        credits: 600, // Reset to free tier credits
       },
     });
 

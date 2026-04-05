@@ -83,7 +83,7 @@ export default async function AdminUserDetailPage({ params }: PageProps) {
   const email = target.emailAddresses?.[0]?.emailAddress ?? "—";
   const name = target.fullName ?? target.username ?? "Unnamed";
   const credits =
-    (target.unsafeMetadata?.credits as number | undefined) ?? 100;
+    (target.unsafeMetadata?.credits as number | undefined) ?? 600;
   const adjustmentLog =
     (target.unsafeMetadata?.creditAdjustments as
       | {

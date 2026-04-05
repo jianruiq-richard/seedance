@@ -25,7 +25,7 @@ export async function updateUserCreditsWithLog(
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
   const beforeCredits =
-    (user.unsafeMetadata?.credits as number | undefined) ?? 0;
+    (user.unsafeMetadata?.credits as number | undefined) ?? 600;
   const existingLog =
     (user.unsafeMetadata?.creditAdjustments as
       | {

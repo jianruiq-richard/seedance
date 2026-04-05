@@ -51,7 +51,7 @@ export default async function AdminUsersPage() {
             const email = entry.emailAddresses?.[0]?.emailAddress ?? "—";
             const name = entry.fullName ?? entry.username ?? "Unnamed";
             const credits =
-              (entry.unsafeMetadata?.credits as number | undefined) ?? 100;
+              (entry.unsafeMetadata?.credits as number | undefined) ?? 600;
 
             return (
               <div

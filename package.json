@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "generate-samples": "node scripts/generate-samples.js"
+    "generate-samples": "node scripts/generate-samples.js",
+    "generate-quick-samples": "node scripts/generate-quick-samples.js"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.5",

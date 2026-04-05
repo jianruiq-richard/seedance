@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const user = await client.users.getUser(userId);
 
     // 获取当前积分，然后增加
-    const currentCredits = (user.unsafeMetadata?.credits as number) || 100;
+    const currentCredits = (user.unsafeMetadata?.credits as number) || 600;
     const newCredits = currentCredits + (credits || 5000);
 
     await client.users.updateUser(userId, {

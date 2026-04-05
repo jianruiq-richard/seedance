@@ -7,7 +7,7 @@ import StripeSubscription from "@/app/components/StripeSubscription";
 export default function BillingPage() {
   const { user } = useUser();
   const credits =
-    (user?.unsafeMetadata?.credits as number | undefined) ?? 100;
+    (user?.unsafeMetadata?.credits as number | undefined) ?? 600;
   const currentPlan = user?.unsafeMetadata?.currentPlan as string | undefined;
   const subscriptionStatus = user?.unsafeMetadata?.subscriptionStatus as string | undefined;
 

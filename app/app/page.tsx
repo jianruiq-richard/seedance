@@ -36,6 +36,7 @@ const DEFAULT_PRICE_WITH_AUDIO = 16 * PRICE_OVER_COST;
 const DEFAULT_PRICE_WITHOUT_AUDIO = 8 * PRICE_OVER_COST;
 const CREDITS_PER_USD = 1000;
 const USD_CNY_RATE = 7.2;
+const DEFAULT_NEW_USER_CREDITS = 600;
 
 const pricingResolutionMap = {
   "480p": {
@@ -146,7 +147,7 @@ export default function AppPage() {
   const [seedKey, setSeedKey] = useState<number>(Date.now());
   const [lastGeneratedAt, setLastGeneratedAt] = useState<string>("");
 
-  const [credits, setCredits] = useState<number>(100);
+  const [credits, setCredits] = useState<number>(600);
   const [pricingCredits, setPricingCredits] = useState<number>(100);
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [pricingLoading, setPricingLoading] = useState<boolean>(false);
@@ -154,7 +155,8 @@ export default function AppPage() {
 
   useEffect(() => {
     const nextCredits =
-      (user?.unsafeMetadata?.credits as number | undefined) ?? 100;
+      (user?.unsafeMetadata?.credits as number | undefined) ??
+      DEFAULT_NEW_USER_CREDITS;
     setCredits(nextCredits);
   }, [user]);
 

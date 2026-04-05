@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local source sample (too large for repo)
+public/samples/dark_barbie_sound_1080.mp4

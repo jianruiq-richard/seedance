@@ -34,7 +34,7 @@ export default function TestCreditsPage() {
     }
   };
 
-  const credits = (user?.unsafeMetadata?.credits as number | undefined) ?? 100;
+  const credits = (user?.unsafeMetadata?.credits as number | undefined) ?? 600;
   const currentPlan = user?.unsafeMetadata?.currentPlan as string | undefined;
 
   return (
