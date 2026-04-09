@@ -353,7 +353,19 @@ export default function AppPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.error || "Generation failed.");
+        const detail = data?.detail
+          ? typeof data.detail === "string"
+            ? data.detail
+            : JSON.stringify(data.detail)
+          : "";
+        const statusPart = data?.upstreamStatus
+          ? ` (upstream ${data.upstreamStatus})`
+          : "";
+        throw new Error(
+          `${data?.error || "Generation failed."}${statusPart}${
+            detail ? `\n${detail}` : ""
+          }`
+        );
       }
 
       let taskStatus = data?.status ?? "queued";
@@ -374,7 +386,19 @@ export default function AppPage() {
             break;
           }
           if (taskStatus === "failed") {
-            throw new Error(pollData?.error?.message || "Generation failed.");
+            const pollError =
+              pollData?.error?.message ||
+              (typeof pollData?.error === "string" ? pollData.error : "");
+            const pollDetail = pollData?.detail
+              ? typeof pollData.detail === "string"
+                ? pollData.detail
+                : JSON.stringify(pollData.detail)
+              : "";
+            throw new Error(
+              `${pollError || "Generation failed."}${
+                pollDetail ? `\n${pollDetail}` : ""
+              }`
+            );
           }
         }
       }

@@ -109,6 +109,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "Seedance request failed",
+        upstreamStatus: response.status,
         detail: detail || `HTTP ${response.status} ${response.statusText}`,
       },
       { status: 500 }
@@ -155,6 +156,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         error: "Seedance polling failed",
+        upstreamStatus: response.status,
         detail: detail || `HTTP ${response.status} ${response.statusText}`,
       },
       { status: 500 }
