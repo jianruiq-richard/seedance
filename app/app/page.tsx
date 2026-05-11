@@ -24,7 +24,7 @@ const ratios = [
 
 const durations = [4, 5, 6, 8, 10, 12, 15];
 const GENERATION_POLL_INTERVAL_MS = 3000;
-const GENERATION_MAX_POLLS = 100;
+const GENERATION_MAX_POLLS = 200;
 
 type Mode = "text" | "image";
 type MediaKind = "image" | "video" | "audio";
