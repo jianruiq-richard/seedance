@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth, clerkClient } from "@clerk/nextjs/server";
+import {
+  calculateCreditCost,
+  DEFAULT_NEW_USER_CREDITS,
+} from "../../lib/credits";
 
 export const runtime = "nodejs";
 
@@ -23,6 +27,20 @@ type GenerateRequest = {
   service_tier?: "default" | "flex";
   execution_expires_after?: number;
   return_last_frame?: boolean;
+};
+
+type CreditUsageEntry = {
+  at: string;
+  amount: number;
+  note?: string;
+  taskId?: string | null;
+  prompt?: string;
+  params?: {
+    ratio?: string;
+    resolution?: string;
+    duration?: number;
+    generateAudio?: boolean;
+  };
 };
 
 function requireConfig() {
@@ -57,6 +75,38 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as GenerateRequest;
+  const resolution = body.resolution ?? "720p";
+  const ratio = body.ratio ?? "16:9";
+  const duration = body.duration ?? 6;
+  const generateAudio = body.generate_audio ?? true;
+  const creditCost = calculateCreditCost({
+    resolution,
+    ratio,
+    duration,
+    generateAudio,
+  });
+
+  if ("error" in creditCost) {
+    return NextResponse.json({ error: creditCost.error }, { status: 400 });
+  }
+
+  const client = await clerkClient();
+  const clerkUser = await client.users.getUser(userId);
+  const currentCredits =
+    (clerkUser.unsafeMetadata?.credits as number | undefined) ??
+    DEFAULT_NEW_USER_CREDITS;
+
+  if (currentCredits < creditCost.credits) {
+    return NextResponse.json(
+      {
+        error: "Not enough credits",
+        creditsRequired: creditCost.credits,
+        creditsRemaining: currentCredits,
+      },
+      { status: 402 }
+    );
+  }
+
   const content: Array<Record<string, unknown>> = [
     {
       type: "text",
@@ -89,9 +139,9 @@ export async function POST(request: Request) {
     body: JSON.stringify({
       model,
       content,
-      ratio: body.ratio,
-      resolution: body.resolution,
-      duration: body.duration,
+      ratio,
+      resolution,
+      duration,
       frames: body.frames,
       seed: body.seed,
       camera_fixed: body.camera_fixed,
@@ -117,10 +167,39 @@ export async function POST(request: Request) {
   }
 
   const data = (await response.json()) as { id?: string };
+  const updatedCredits = Math.max(currentCredits - creditCost.credits, 0);
+  const usageLog =
+    (clerkUser.unsafeMetadata?.creditUsage as CreditUsageEntry[] | undefined) ??
+    [];
+
+  await client.users.updateUserMetadata(userId, {
+    unsafeMetadata: {
+      ...clerkUser.unsafeMetadata,
+      credits: updatedCredits,
+      creditUsage: [
+        ...usageLog,
+        {
+          at: new Date().toISOString(),
+          amount: -creditCost.credits,
+          note: `Generate (${body.mode})`,
+          taskId: data.id ?? null,
+          prompt: body.prompt.slice(0, 240),
+          params: {
+            ratio,
+            resolution,
+            duration,
+            generateAudio,
+          },
+        },
+      ].slice(-100),
+    },
+  });
 
   return NextResponse.json({
     taskId: data.id ?? null,
     status: "queued",
+    creditsCharged: creditCost.credits,
+    creditsRemaining: updatedCredits,
   });
 }
 

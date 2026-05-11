@@ -62,7 +62,7 @@ export default async function AdminUserDetailPage({ searchParams }: PageProps) {
   let target;
   try {
     target = await client.users.getUser(userId);
-  } catch (error) {
+  } catch {
     return (
       <div className="min-h-screen bg-[#0a0b10] text-white">
         <div className="mx-auto max-w-3xl px-6 py-24">
@@ -92,7 +92,19 @@ export default async function AdminUserDetailPage({ searchParams }: PageProps) {
       | undefined) ?? [];
   const usageLog =
     (target.unsafeMetadata?.creditUsage as
-      | { at: string; amount: number; note?: string }[]
+      | {
+          at: string;
+          amount: number;
+          note?: string;
+          taskId?: string | null;
+          prompt?: string;
+          params?: {
+            ratio?: string;
+            resolution?: string;
+            duration?: number;
+            generateAudio?: boolean;
+          };
+        }[]
       | undefined) ?? [];
 
   return (
@@ -211,6 +223,19 @@ export default async function AdminUserDetailPage({ searchParams }: PageProps) {
                       <div className="mt-2 text-white/50">
                         {entry.amount} credits
                       </div>
+                      {(entry.params || entry.taskId) && (
+                        <div className="mt-2 text-white/40">
+                          {entry.params?.resolution ?? "—"} ·{" "}
+                          {entry.params?.ratio ?? "—"} ·{" "}
+                          {entry.params?.duration ?? "—"}s
+                          {entry.taskId ? ` · ${entry.taskId}` : ""}
+                        </div>
+                      )}
+                      {entry.prompt && (
+                        <p className="mt-2 break-words text-white/50">
+                          {entry.prompt}
+                        </p>
+                      )}
                     </div>
                   ))
               )}

@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { UserButton, useClerk, useUser } from "@clerk/nextjs";
+import {
+  calculateCreditCost,
+  DEFAULT_NEW_USER_CREDITS,
+  resolutions,
+  type RatioKey,
+} from "../lib/credits";
 
 const ratios = [
   { label: "16:9", value: "16:9" },
@@ -15,11 +21,8 @@ const ratios = [
 ];
 
 const durations = [4, 5, 6, 8, 10, 12];
-const resolutions = ["480p", "720p", "1080p"] as const;
 
 type Mode = "text" | "image";
-
-type RatioKey = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 
 const ratioSizeMap: Record<RatioKey, { width: number; height: number }> = {
   "16:9": { width: 960, height: 540 },
@@ -29,82 +32,6 @@ const ratioSizeMap: Record<RatioKey, { width: number; height: number }> = {
   "3:4": { width: 600, height: 800 },
   "21:9": { width: 1260, height: 540 },
 };
-
-const DEFAULT_FPS = 24;
-const PRICE_OVER_COST = 2;
-const DEFAULT_PRICE_WITH_AUDIO = 16 * PRICE_OVER_COST;
-const DEFAULT_PRICE_WITHOUT_AUDIO = 8 * PRICE_OVER_COST;
-const CREDITS_PER_USD = 1000;
-const USD_CNY_RATE = 7.2;
-const DEFAULT_NEW_USER_CREDITS = 600;
-
-const pricingResolutionMap = {
-  "480p": {
-    "16:9": [864, 496],
-    "4:3": [752, 560],
-    "1:1": [640, 640],
-    "3:4": [560, 752],
-    "9:16": [496, 864],
-    "21:9": [992, 432],
-  },
-  "720p": {
-    "16:9": [1280, 720],
-    "4:3": [1112, 834],
-    "1:1": [960, 960],
-    "3:4": [834, 1112],
-    "9:16": [720, 1280],
-    "21:9": [1470, 630],
-  },
-  "1080p": {
-    "16:9": [1920, 1080],
-    "4:3": [1664, 1248],
-    "1:1": [1440, 1440],
-    "3:4": [1248, 1664],
-    "9:16": [1080, 1920],
-    "21:9": [2206, 946],
-  },
-} satisfies Record<string, Record<RatioKey, [number, number]>>;
-
-type PriceResult =
-  | {
-      totalTokens: number;
-      unitPrice: number;
-      totalPrice: number;
-    }
-  | {
-      error: string;
-    };
-
-function calculateVideoPrice(
-  resolutionLabel: (typeof resolutions)[number],
-  aspectRatio: string,
-  durationSeconds: number,
-  hasAudio: boolean,
-  fps = DEFAULT_FPS
-): PriceResult {
-  if (aspectRatio === "adaptive") {
-    aspectRatio = "16:9";
-  }
-  const ratioMap = pricingResolutionMap[resolutionLabel];
-  if (!ratioMap) {
-    return { error: `Unsupported resolution: ${resolutionLabel}` };
-  }
-  if (!Object.prototype.hasOwnProperty.call(ratioMap, aspectRatio)) {
-    return { error: `Unsupported ratio for ${resolutionLabel}: ${aspectRatio}` };
-  }
-  const [width, height] = ratioMap[aspectRatio as RatioKey];
-  const totalTokens = (width * height * fps * durationSeconds) / 1024;
-  const unitPrice = hasAudio
-    ? DEFAULT_PRICE_WITH_AUDIO
-    : DEFAULT_PRICE_WITHOUT_AUDIO;
-  const totalPrice = totalTokens * (unitPrice / 1_000_000);
-
-  return {
-    totalTokens,
-    unitPrice,
-    totalPrice,
-  };
-}
 
 export default function AppPage() {
   const { user } = useUser();
@@ -134,7 +61,6 @@ export default function AppPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string>("");
-  const [uploading, setUploading] = useState<boolean>(false);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [dragActive, setDragActive] = useState<boolean>(false);
 
@@ -184,23 +110,19 @@ export default function AppPage() {
     setPricingLoading(true);
     setPricingError(null);
     const handle = setTimeout(() => {
-      const result = calculateVideoPrice(
+      const result = calculateCreditCost({
         resolution,
         ratio,
         duration,
-        generateAudio
-      );
+        generateAudio,
+      });
       if ("error" in result) {
         setPricingError(result.error);
         setPricingCredits(0);
         setPricingLoading(false);
         return;
       }
-      const creditsNeeded = Math.max(
-        1,
-        Math.ceil((result.totalPrice / USD_CNY_RATE) * CREDITS_PER_USD)
-      );
-      setPricingCredits(creditsNeeded);
+      setPricingCredits(result.credits);
       setPricingLoading(false);
     }, 200);
     return () => clearTimeout(handle);
@@ -231,7 +153,6 @@ export default function AppPage() {
 
   const handleUpload = async () => {
     if (!imageFile) return;
-    setUploading(true);
     setUploadProgress(0);
     setErrorMessage(null);
     try {
@@ -254,7 +175,7 @@ export default function AppPage() {
               } else {
                 reject(new Error("Upload failed."));
               }
-            } catch (error) {
+            } catch {
               reject(new Error("Upload failed."));
             }
           } else {
@@ -282,8 +203,6 @@ export default function AppPage() {
       setErrorMessage(
         error instanceof Error ? error.message : "Upload failed."
       );
-    } finally {
-      setUploading(false);
     }
   };
 
@@ -368,6 +287,10 @@ export default function AppPage() {
         );
       }
 
+      if (typeof data?.creditsRemaining === "number") {
+        setCredits(data.creditsRemaining);
+      }
+
       let taskStatus = data?.status ?? "queued";
       let outputUrl = data?.videoUrl ?? null;
       const taskId = data?.taskId ?? null;
@@ -413,26 +336,6 @@ export default function AppPage() {
       }
 
       setSeedKey(Date.now());
-      const updatedCredits = Math.max(credits - pricingCredits, 0);
-      setCredits(updatedCredits);
-      const usageLog =
-        (user?.unsafeMetadata?.creditUsage as
-          | { at: string; amount: number; note?: string }[]
-          | undefined) ?? [];
-      await user?.update({
-        unsafeMetadata: {
-          ...user?.unsafeMetadata,
-          credits: updatedCredits,
-          creditUsage: [
-            ...usageLog,
-            {
-              at: new Date().toISOString(),
-              amount: -100,
-              note: `Generate (${mode})`,
-            },
-          ].slice(-50),
-        },
-      });
     } catch (error) {
       setStatus("error");
       setErrorMessage(

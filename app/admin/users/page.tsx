@@ -1,6 +1,8 @@
 import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
 
+export const dynamic = "force-dynamic";
+
 function isAdminEmail(email: string | null) {
   if (!email) return false;
   const raw = process.env.ADMIN_EMAILS ?? "";
@@ -9,6 +11,31 @@ function isAdminEmail(email: string | null) {
     .map((entry) => entry.trim().toLowerCase())
     .filter(Boolean);
   return list.includes(email.toLowerCase());
+}
+
+async function getAllUsers() {
+  const client = await clerkClient();
+  const limit = 100;
+  const firstPage = await client.users.getUserList({
+    limit,
+    offset: 0,
+    orderBy: "-created_at",
+  });
+  const users = [...firstPage.data];
+
+  for (let offset = limit; offset < firstPage.totalCount; offset += limit) {
+    const nextPage = await client.users.getUserList({
+      limit,
+      offset,
+      orderBy: "-created_at",
+    });
+    users.push(...nextPage.data);
+  }
+
+  return {
+    data: users,
+    totalCount: firstPage.totalCount,
+  };
 }
 
 export default async function AdminUsersPage() {
@@ -28,10 +55,7 @@ export default async function AdminUsersPage() {
     );
   }
 
-  const client = await clerkClient();
-  const users = await client.users.getUserList({
-    limit: 50,
-  });
+  const users = await getAllUsers();
 
   return (
     <div className="min-h-screen bg-[#0a0b10] text-white">
@@ -42,7 +66,7 @@ export default async function AdminUsersPage() {
           </p>
           <h1 className="mt-3 text-3xl font-semibold">Users & Credits</h1>
           <p className="mt-2 text-sm text-white/60">
-            Update user credit balances directly.
+            Showing {users.data.length} of {users.totalCount} Clerk users.
           </p>
         </div>
 
