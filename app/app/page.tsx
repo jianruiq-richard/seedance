@@ -23,6 +23,8 @@ const ratios = [
 ];
 
 const durations = [4, 5, 6, 8, 10, 12, 15];
+const GENERATION_POLL_INTERVAL_MS = 3000;
+const GENERATION_MAX_POLLS = 100;
 
 type Mode = "text" | "image";
 type MediaKind = "image" | "video" | "audio";
@@ -444,8 +446,10 @@ export default function AppPage() {
       const jobId = data?.jobId ?? null;
 
       if (!outputUrl && taskId) {
-        for (let i = 0; i < 40; i += 1) {
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+        for (let i = 0; i < GENERATION_MAX_POLLS; i += 1) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, GENERATION_POLL_INTERVAL_MS)
+          );
           const pollParams = new URLSearchParams({ taskId });
           if (jobId) {
             pollParams.set("jobId", jobId);
