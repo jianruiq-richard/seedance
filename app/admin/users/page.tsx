@@ -3,6 +3,8 @@ import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+const pageSizeOptions = [50, 100, 200] as const;
+
 function isAdminEmail(email: string | null) {
   if (!email) return false;
   const raw = process.env.ADMIN_EMAILS ?? "";
@@ -13,32 +15,32 @@ function isAdminEmail(email: string | null) {
   return list.includes(email.toLowerCase());
 }
 
-async function getAllUsers() {
-  const client = await clerkClient();
-  const limit = 100;
-  const firstPage = await client.users.getUserList({
-    limit,
-    offset: 0,
-    orderBy: "-created_at",
-  });
-  const users = [...firstPage.data];
-
-  for (let offset = limit; offset < firstPage.totalCount; offset += limit) {
-    const nextPage = await client.users.getUserList({
-      limit,
-      offset,
-      orderBy: "-created_at",
-    });
-    users.push(...nextPage.data);
-  }
-
-  return {
-    data: users,
-    totalCount: firstPage.totalCount,
-  };
+function parsePositiveInt(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-export default async function AdminUsersPage() {
+function parsePageSize(value: string | undefined) {
+  const parsed = parsePositiveInt(value, 50);
+  return pageSizeOptions.includes(parsed as (typeof pageSizeOptions)[number])
+    ? parsed
+    : 50;
+}
+
+async function getUsersPage(page: number, pageSize: number) {
+  const client = await clerkClient();
+  return client.users.getUserList({
+    limit: pageSize,
+    offset: (page - 1) * pageSize,
+    orderBy: "-created_at",
+  });
+}
+
+type PageProps = {
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
+};
+
+export default async function AdminUsersPage({ searchParams }: PageProps) {
   const user = await currentUser();
   const primaryEmail = user?.emailAddresses?.[0]?.emailAddress ?? null;
 
@@ -55,7 +57,21 @@ export default async function AdminUsersPage() {
     );
   }
 
-  const users = await getAllUsers();
+  const resolvedParams = await searchParams;
+  const pageSize = parsePageSize(resolvedParams.pageSize);
+  const requestedPage = parsePositiveInt(resolvedParams.page, 1);
+  let users = await getUsersPage(requestedPage, pageSize);
+  const totalPages = Math.max(1, Math.ceil(users.totalCount / pageSize));
+  const page = Math.min(requestedPage, totalPages);
+  if (page !== requestedPage) {
+    users = await getUsersPage(page, pageSize);
+  }
+
+  const displayedStart =
+    users.totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
+  const displayedEnd = Math.min(page * pageSize, users.totalCount);
+  const pageHref = (nextPage: number) =>
+    `/admin/users?page=${nextPage}&pageSize=${pageSize}`;
 
   return (
     <div className="min-h-screen bg-[#0a0b10] text-white">
@@ -66,9 +82,78 @@ export default async function AdminUsersPage() {
           </p>
           <h1 className="mt-3 text-3xl font-semibold">Users & Credits</h1>
           <p className="mt-2 text-sm text-white/60">
-            Showing {users.data.length} of {users.totalCount} Clerk users.
+            Showing {displayedStart}-{displayedEnd} of {users.totalCount} Clerk
+            users.
           </p>
         </div>
+
+        <form
+          className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70"
+          method="get"
+        >
+          <label className="grid gap-2">
+            <span className="text-xs uppercase tracking-[0.2em] text-white/40">
+              Per page
+            </span>
+            <select
+              className="rounded-full border border-white/20 bg-black/30 px-4 py-2 text-white/80"
+              name="pageSize"
+              defaultValue={pageSize}
+            >
+              {pageSizeOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="grid gap-2">
+            <span className="text-xs uppercase tracking-[0.2em] text-white/40">
+              Page
+            </span>
+            <input
+              className="w-24 rounded-full border border-white/20 bg-black/30 px-4 py-2 text-white/80"
+              name="page"
+              type="number"
+              min={1}
+              max={totalPages}
+              defaultValue={page}
+            />
+          </label>
+          <button
+            className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0a0b10]"
+            type="submit"
+          >
+            Go
+          </button>
+          <div className="ml-auto flex items-center gap-2 text-xs">
+            <Link
+              aria-disabled={page <= 1}
+              className={`rounded-full border border-white/20 px-4 py-2 ${
+                page <= 1
+                  ? "pointer-events-none text-white/30"
+                  : "text-white/80 hover:border-white/60 hover:text-white"
+              }`}
+              href={pageHref(Math.max(page - 1, 1))}
+            >
+              Previous
+            </Link>
+            <span className="px-2 text-white/50">
+              {page} / {totalPages}
+            </span>
+            <Link
+              aria-disabled={page >= totalPages}
+              className={`rounded-full border border-white/20 px-4 py-2 ${
+                page >= totalPages
+                  ? "pointer-events-none text-white/30"
+                  : "text-white/80 hover:border-white/60 hover:text-white"
+              }`}
+              href={pageHref(Math.min(page + 1, totalPages))}
+            >
+              Next
+            </Link>
+          </div>
+        </form>
 
         <div className="grid gap-4">
           {users.data.map((entry) => {
