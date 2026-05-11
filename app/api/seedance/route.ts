@@ -21,10 +21,12 @@ const configuredModel = process.env.SEEDANCE_MODEL || DEFAULT_SEEDANCE_MODEL;
 const supportedModels = new Set<string>(seedanceModels.map((item) => item.value));
 
 type GenerateRequest = {
-  mode: "text" | "image";
+  mode?: "text" | "image";
   model?: string;
   prompt: string;
   imageUrl?: string | null;
+  videoUrl?: string | null;
+  audioUrl?: string | null;
   ratio?: string;
   resolution?: string;
   duration?: number;
@@ -129,6 +131,35 @@ function validateSeedance2Options({
   return null;
 }
 
+function validateContentCombination({
+  prompt,
+  imageUrl,
+  videoUrl,
+  audioUrl,
+}: {
+  prompt: string;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  audioUrl?: string | null;
+}) {
+  const hasText = Boolean(prompt.trim());
+  const hasImage = Boolean(imageUrl?.trim());
+  const hasVideo = Boolean(videoUrl?.trim());
+  const hasAudio = Boolean(audioUrl?.trim());
+
+  if (!hasText && !hasImage && !hasVideo) {
+    return hasAudio
+      ? "Audio input must be combined with an image or video reference."
+      : "Provide a prompt, image, or video reference before generating.";
+  }
+
+  if (hasAudio && !hasImage && !hasVideo) {
+    return "Audio input must be combined with an image or video reference.";
+  }
+
+  return null;
+}
+
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -145,11 +176,21 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as GenerateRequest;
+  const prompt = body.prompt?.trim() ?? "";
   const model = normalizeModel(body.model);
   const resolution = body.resolution ?? "720p";
   const ratio = body.ratio ?? "adaptive";
   const duration = body.duration ?? 5;
   const generateAudio = body.generate_audio ?? true;
+  const imageUrl = body.imageUrl?.trim() || null;
+  const videoUrl = body.videoUrl?.trim() || null;
+  const audioUrl = body.audioUrl?.trim() || null;
+  const contentValidationError = validateContentCombination({
+    prompt,
+    imageUrl,
+    videoUrl,
+    audioUrl,
+  });
   const validationError = validateSeedance2Options({
     model,
     resolution,
@@ -157,6 +198,10 @@ export async function POST(request: Request) {
     duration,
     executionExpiresAfter: body.execution_expires_after,
   });
+
+  if (contentValidationError) {
+    return NextResponse.json({ error: contentValidationError }, { status: 400 });
+  }
 
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
@@ -192,27 +237,44 @@ export async function POST(request: Request) {
     );
   }
 
-  const content: Array<Record<string, unknown>> = [
-    {
-      type: "text",
-      text: body.prompt,
-    },
-  ];
+  const content: Array<Record<string, unknown>> = [];
 
-  if (body.mode === "image") {
-    if (!body.imageUrl) {
-      return NextResponse.json(
-        { error: "Image URL is required for image-to-video." },
-        { status: 400 }
-      );
-    }
+  if (prompt) {
+    content.push({
+      type: "text",
+      text: prompt,
+    });
+  }
+
+  if (imageUrl) {
     content.push({
       type: "image_url",
       image_url: {
-        url: body.imageUrl,
+        url: imageUrl,
       },
     });
   }
+
+  if (videoUrl) {
+    content.push({
+      type: "video_url",
+      video_url: {
+        url: videoUrl,
+      },
+    });
+  }
+
+  if (audioUrl) {
+    content.push({
+      type: "audio_url",
+      audio_url: {
+        url: audioUrl,
+      },
+    });
+  }
+
+  const generationMode = imageUrl ? "image" : "text";
+  const promptForLog = prompt || "(media reference)";
 
   const baseUrl = getBaseUrl();
   const response = await fetch(`${baseUrl}/contents/generations/tasks`, {
@@ -253,9 +315,9 @@ export async function POST(request: Request) {
   const generationJob = await createGenerationJob({
     clerkUserId: userId,
     upstreamTaskId: taskId,
-    mode: body.mode,
-    prompt: body.prompt,
-    imageUrl: body.mode === "image" ? body.imageUrl ?? null : null,
+    mode: generationMode,
+    prompt: promptForLog,
+    imageUrl,
     creditsCharged: creditCost.credits,
     ratio,
     resolution,
@@ -276,9 +338,9 @@ export async function POST(request: Request) {
         {
           at: new Date().toISOString(),
           amount: -creditCost.credits,
-          note: `Generate (${body.mode})`,
+          note: `Generate (${generationMode})`,
           taskId,
-          prompt: body.prompt.slice(0, 240),
+          prompt: promptForLog.slice(0, 240),
           params: {
             ratio,
             resolution,

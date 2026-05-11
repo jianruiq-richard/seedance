@@ -25,6 +25,26 @@ const ratios = [
 const durations = [4, 5, 6, 8, 10, 12, 15];
 
 type Mode = "text" | "image";
+type MediaKind = "image" | "video" | "audio";
+
+const mediaKindLabels: Record<MediaKind, string> = {
+  image: "Image",
+  video: "Video",
+  audio: "Audio",
+};
+
+const emptyMediaRecord = <T,>(value: T): Record<MediaKind, T> => ({
+  image: value,
+  video: value,
+  audio: value,
+});
+
+function getMediaKind(file: File): MediaKind | null {
+  if (file.type.startsWith("image/")) return "image";
+  if (file.type.startsWith("video/")) return "video";
+  if (file.type.startsWith("audio/")) return "audio";
+  return null;
+}
 
 type GenerationHistoryItem = {
   id: string;
@@ -58,7 +78,6 @@ export default function AppPage() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const isSignedIn = Boolean(user);
-  const [mode, setMode] = useState<Mode>("text");
   const [model, setModel] = useState<string>(DEFAULT_SEEDANCE_MODEL);
   const [prompt, setPrompt] = useState(
     "Neon city streets, slow motion, cinematic glow"
@@ -75,10 +94,21 @@ export default function AppPage() {
     useState<number>(172800);
   const [returnLastFrame, setReturnLastFrame] = useState<boolean>(false);
 
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState<string>("");
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [referenceFiles, setReferenceFiles] = useState<
+    Record<MediaKind, File | null>
+  >(emptyMediaRecord<File | null>(null));
+  const [referencePreviews, setReferencePreviews] = useState<
+    Record<MediaKind, string | null>
+  >(emptyMediaRecord<string | null>(null));
+  const [referenceUrls, setReferenceUrls] = useState<Record<MediaKind, string>>(
+    emptyMediaRecord("")
+  );
+  const [uploadProgress, setUploadProgress] = useState<Record<MediaKind, number>>(
+    emptyMediaRecord(0)
+  );
+  const [uploading, setUploading] = useState<Record<MediaKind, boolean>>(
+    emptyMediaRecord(false)
+  );
   const [dragActive, setDragActive] = useState<boolean>(false);
 
   const [status, setStatus] = useState<"idle" | "generating" | "ready" | "error">(
@@ -120,6 +150,9 @@ export default function AppPage() {
   }, []);
 
   const cleanupUrls = useRef<string[]>([]);
+  const uploadTokens = useRef<Record<MediaKind, string | null>>(
+    emptyMediaRecord<string | null>(null)
+  );
 
   const aspectSize = useMemo(() => {
     const normalized = ratio as RatioKey;
@@ -170,22 +203,6 @@ export default function AppPage() {
     };
   }, []);
 
-  useEffect(() => {
-    if (!imageFile) {
-      setImagePreview(null);
-      return;
-    }
-    const nextUrl = URL.createObjectURL(imageFile);
-    cleanupUrls.current.push(nextUrl);
-    setImagePreview(nextUrl);
-  }, [imageFile]);
-
-  useEffect(() => {
-    if (!imageFile) return;
-    void handleUpload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imageFile]);
-
   const loadGenerationHistory = useCallback(
     async ({ reset = false }: { reset?: boolean } = {}) => {
       if (!isSignedIn) {
@@ -228,9 +245,14 @@ export default function AppPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, user?.id]);
 
-  const handleUpload = async () => {
-    if (!imageFile) return;
-    setUploadProgress(0);
+  const uploadReferenceFile = async (
+    kind: MediaKind,
+    file: File,
+    token: string
+  ) => {
+    const isCurrentUpload = () => uploadTokens.current[kind] === token;
+    setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+    setUploading((prev) => ({ ...prev, [kind]: true }));
     setErrorMessage(null);
     try {
       await new Promise<void>((resolve, reject) => {
@@ -239,7 +261,9 @@ export default function AppPage() {
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
             const percent = Math.round((event.loaded / event.total) * 100);
-            setUploadProgress(percent);
+            if (isCurrentUpload()) {
+              setUploadProgress((prev) => ({ ...prev, [kind]: percent }));
+            }
           }
         };
         xhr.onload = () => {
@@ -247,7 +271,10 @@ export default function AppPage() {
             try {
               const data = JSON.parse(xhr.responseText);
               if (data?.url) {
-                setImageUrl(data.url);
+                if (isCurrentUpload()) {
+                  setReferenceUrls((prev) => ({ ...prev, [kind]: data.url }));
+                  setUploadProgress((prev) => ({ ...prev, [kind]: 100 }));
+                }
                 resolve();
               } else {
                 reject(new Error("Upload failed."));
@@ -273,26 +300,62 @@ export default function AppPage() {
           );
         };
         const formData = new FormData();
-        formData.append("file", imageFile);
+        formData.append("file", file);
         xhr.send(formData);
       });
     } catch (error) {
-      setErrorMessage(
-        error instanceof Error ? error.message : "Upload failed."
-      );
+      if (isCurrentUpload()) {
+        setErrorMessage(
+          error instanceof Error ? error.message : "Upload failed."
+        );
+      }
+    } finally {
+      if (isCurrentUpload()) {
+        setUploading((prev) => ({ ...prev, [kind]: false }));
+      }
     }
   };
 
-  const handleRemoveImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    setImageUrl("");
-    setUploadProgress(0);
+  const addReferenceFile = (file: File) => {
+    const kind = getMediaKind(file);
+    if (!kind) {
+      setErrorMessage("Upload an image, video, or audio file.");
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(file);
+    const token = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    uploadTokens.current[kind] = token;
+    cleanupUrls.current.push(previewUrl);
+    setReferenceFiles((prev) => ({ ...prev, [kind]: file }));
+    setReferencePreviews((prev) => ({ ...prev, [kind]: previewUrl }));
+    setReferenceUrls((prev) => ({ ...prev, [kind]: "" }));
+    setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+    void uploadReferenceFile(kind, file, token);
+  };
+
+  const addReferenceFiles = (files: FileList | File[]) => {
+    Array.from(files).forEach(addReferenceFile);
+  };
+
+  const handleRemoveReference = (kind: MediaKind) => {
+    uploadTokens.current[kind] = null;
+    setReferenceFiles((prev) => ({ ...prev, [kind]: null }));
+    setReferencePreviews((prev) => ({ ...prev, [kind]: null }));
+    setReferenceUrls((prev) => ({ ...prev, [kind]: "" }));
+    setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+    setUploading((prev) => ({ ...prev, [kind]: false }));
     setErrorMessage(null);
   };
 
   const handleGenerate = async () => {
     setErrorMessage(null);
+    const trimmedPrompt = prompt.trim();
+    const hasImage = Boolean(referenceUrls.image.trim());
+    const hasVideo = Boolean(referenceUrls.video.trim());
+    const hasAudio = Boolean(referenceUrls.audio.trim());
+    const isUploading = Object.values(uploading).some(Boolean);
+
     if (!isSignedIn) {
       setErrorMessage("Please sign in to generate videos.");
       return;
@@ -309,8 +372,16 @@ export default function AppPage() {
       setErrorMessage("Not enough credits. Please top up to continue.");
       return;
     }
-    if (mode === "image" && !imageUrl.trim()) {
-      setErrorMessage("Please provide an image URL for image-to-video.");
+    if (isUploading) {
+      setErrorMessage("Wait for uploads to finish before generating.");
+      return;
+    }
+    if (!trimmedPrompt && !hasImage && !hasVideo) {
+      setErrorMessage("Add a prompt, image, or video reference before generating.");
+      return;
+    }
+    if (hasAudio && !hasImage && !hasVideo) {
+      setErrorMessage("Audio must be combined with an image or video reference.");
       return;
     }
     setStatus("generating");
@@ -330,10 +401,11 @@ export default function AppPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          mode,
           model,
-          prompt,
-          imageUrl: mode === "image" ? imageUrl : null,
+          prompt: trimmedPrompt,
+          imageUrl: hasImage ? referenceUrls.image : null,
+          videoUrl: hasVideo ? referenceUrls.video : null,
+          audioUrl: hasAudio ? referenceUrls.audio : null,
           ratio,
           resolution,
           duration,
@@ -498,27 +570,6 @@ export default function AppPage() {
 
       <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[360px_1fr]">
         <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <div className="flex gap-2 rounded-full bg-white/5 p-1 text-xs">
-            <button
-              className={`flex-1 rounded-full px-3 py-2 transition ${
-                mode === "text" ? "bg-white text-[#0a0b10]" : "text-white/70"
-              }`}
-              onClick={() => setMode("text")}
-              type="button"
-            >
-              Text to Video
-            </button>
-            <button
-              className={`flex-1 rounded-full px-3 py-2 transition ${
-                mode === "image" ? "bg-white text-[#0a0b10]" : "text-white/70"
-              }`}
-              onClick={() => setMode("image")}
-              type="button"
-            >
-              Image to Video
-            </button>
-          </div>
-
           <div className="mt-6 space-y-4">
             <label className="text-xs uppercase tracking-[0.2em] text-white/50">
               Prompt
@@ -529,80 +580,114 @@ export default function AppPage() {
               onChange={(event) => setPrompt(event.target.value)}
             />
 
-            {mode === "image" && (
-              <div className="space-y-3">
-                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
-                  Upload image
-                </label>
-                <label
-                  className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-center text-xs transition ${
-                    dragActive
-                      ? "border-white/80 bg-white/5 text-white"
-                      : "border-white/20 bg-black/20 text-white/60 hover:border-white/50"
-                  }`}
-                  onDragOver={(event) => {
-                    event.preventDefault();
-                    setDragActive(true);
-                  }}
-                  onDragLeave={(event) => {
-                    event.preventDefault();
-                    setDragActive(false);
-                  }}
-                  onDrop={(event) => {
-                    event.preventDefault();
-                    setDragActive(false);
-                    const file = event.dataTransfer.files?.[0] ?? null;
-                    if (file) {
-                      setImageFile(file);
+            <div className="space-y-3">
+              <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                References
+              </label>
+              <label
+                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-center text-xs transition ${
+                  dragActive
+                    ? "border-white/80 bg-white/5 text-white"
+                    : "border-white/20 bg-black/20 text-white/60 hover:border-white/50"
+                }`}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDragActive(true);
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault();
+                  setDragActive(false);
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDragActive(false);
+                  addReferenceFiles(event.dataTransfer.files);
+                }}
+              >
+                <input
+                  className="hidden"
+                  type="file"
+                  accept="image/*,video/*,audio/*"
+                  multiple
+                  onChange={(event) => {
+                    if (event.target.files) {
+                      addReferenceFiles(event.target.files);
                     }
+                    event.target.value = "";
                   }}
-                >
-                  <input
-                    className="hidden"
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) =>
-                      setImageFile(event.target.files?.[0] ?? null)
-                    }
-                  />
-                  <span>Drag & drop or click to upload</span>
-                  {imageFile && (
-                    <span className="text-white/80">{imageFile.name}</span>
-                  )}
-                </label>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
+                />
+                <span>Drag & drop or click to upload</span>
+                <span className="text-white/40">Image, video, or audio</span>
+              </label>
+
+              {(["image", "video", "audio"] as MediaKind[]).map((kind) => {
+                const file = referenceFiles[kind];
+                const preview = referencePreviews[kind];
+                const progress = uploadProgress[kind];
+                if (!file || !preview) return null;
+
+                return (
                   <div
-                    className="h-full rounded-full bg-[#f7c578] transition-all"
-                    style={{ width: `${uploadProgress}%` }}
-                  />
-                </div>
-                {uploadProgress > 0 && uploadProgress < 100 && (
-                  <p className="text-xs text-white/60">
-                    Uploading... {uploadProgress}%
-                  </p>
-                )}
-                {imagePreview && (
-                  <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-black/20 p-3">
-                    <img
-                      className="h-16 w-16 rounded-xl object-cover"
-                      src={imagePreview}
-                      alt="Preview"
-                    />
-                    <div className="flex-1 text-xs text-white/70">
-                      <p className="font-semibold text-white/90">Preview</p>
-                      <p className="mt-1 break-all">{imageFile?.name}</p>
+                    key={kind}
+                    className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 flex-1 items-center gap-3">
+                        {kind === "image" && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            className="h-16 w-16 rounded-xl object-cover"
+                            src={preview}
+                            alt="Reference"
+                          />
+                        )}
+                        {kind === "video" && (
+                          <video
+                            className="h-16 w-16 rounded-xl object-cover"
+                            src={preview}
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        )}
+                        {kind === "audio" && (
+                          <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-xs text-white/60">
+                            Audio
+                          </div>
+                        )}
+                        <div className="min-w-0 text-xs text-white/70">
+                          <p className="font-semibold text-white/90">
+                            {mediaKindLabels[kind]}
+                          </p>
+                          <p className="mt-1 truncate">{file.name}</p>
+                        </div>
+                      </div>
+                      <button
+                        className="rounded-full border border-white/20 px-3 py-1 text-[11px] text-white/80 transition hover:border-white/60 hover:text-white"
+                        type="button"
+                        onClick={() => handleRemoveReference(kind)}
+                      >
+                        Remove
+                      </button>
                     </div>
-                    <button
-                      className="rounded-full border border-white/20 px-3 py-1 text-[11px] text-white/80 transition hover:border-white/60 hover:text-white"
-                      type="button"
-                      onClick={handleRemoveImage}
-                    >
-                      Remove
-                    </button>
+                    {kind === "audio" && (
+                      <audio className="mt-3 w-full" src={preview} controls />
+                    )}
+                    <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-[#f7c578] transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    {progress > 0 && progress < 100 && (
+                      <p className="mt-2 text-xs text-white/60">
+                        Uploading... {progress}%
+                      </p>
+                    )}
                   </div>
-                )}
-              </div>
-            )}
+                );
+              })}
+            </div>
 
             <div className="grid gap-4">
               <div>
@@ -745,7 +830,7 @@ export default function AppPage() {
                 status === "generating" ||
                 pricingLoading ||
                 Boolean(pricingError) ||
-                (mode === "image" && !imageUrl.trim())
+                Object.values(uploading).some(Boolean)
               }
             >
               {status === "generating" ? (
@@ -804,7 +889,7 @@ export default function AppPage() {
                 <a
                   className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0a0b10]"
                   href={downloadUrl}
-                  download={`seedance-${mode}-${ratio}.mp4`}
+                  download={`seedance-${ratio}.mp4`}
                 >
                   Download video
                 </a>
