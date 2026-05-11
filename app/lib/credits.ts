@@ -2,15 +2,28 @@ export const DEFAULT_NEW_USER_CREDITS = 600;
 
 const DEFAULT_FPS = 24;
 const PRICE_OVER_COST = 2;
-const DEFAULT_PRICE_WITH_AUDIO = 16 * PRICE_OVER_COST;
-const DEFAULT_PRICE_WITHOUT_AUDIO = 8 * PRICE_OVER_COST;
+const SEEDANCE_2_STANDARD_UNIT_PRICE = 7.884 * PRICE_OVER_COST;
+const SEEDANCE_2_FAST_UNIT_PRICE = 6.516 * PRICE_OVER_COST;
 const CREDITS_PER_USD = 1000;
 const USD_CNY_RATE = 7.2;
 
 export const resolutions = ["480p", "720p", "1080p"] as const;
+export const seedanceModels = [
+  {
+    label: "Seedance 2.0 Fast",
+    value: "doubao-seedance-2-0-fast-260128",
+  },
+  {
+    label: "Seedance 2.0",
+    value: "doubao-seedance-2-0-260128",
+  },
+] as const;
+
+export const DEFAULT_SEEDANCE_MODEL = seedanceModels[0].value;
 
 export type ResolutionLabel = (typeof resolutions)[number];
 export type RatioKey = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
+export type SeedanceModel = (typeof seedanceModels)[number]["value"];
 
 const pricingResolutionMap = {
   "480p": {
@@ -53,7 +66,7 @@ export function calculateVideoPrice(
   resolutionLabel: string,
   aspectRatio: string,
   durationSeconds: number,
-  hasAudio: boolean,
+  model: string = DEFAULT_SEEDANCE_MODEL,
   fps = DEFAULT_FPS
 ): PriceResult {
   const normalizedRatio = aspectRatio === "adaptive" ? "16:9" : aspectRatio;
@@ -71,9 +84,10 @@ export function calculateVideoPrice(
 
   const [width, height] = ratioMap[normalizedRatio as RatioKey];
   const totalTokens = (width * height * fps * durationSeconds) / 1024;
-  const unitPrice = hasAudio
-    ? DEFAULT_PRICE_WITH_AUDIO
-    : DEFAULT_PRICE_WITHOUT_AUDIO;
+  const unitPrice =
+    model === "doubao-seedance-2-0-260128"
+      ? SEEDANCE_2_STANDARD_UNIT_PRICE
+      : SEEDANCE_2_FAST_UNIT_PRICE;
   const totalPrice = totalTokens * (unitPrice / 1_000_000);
 
   return {
@@ -87,14 +101,15 @@ export function calculateCreditCost({
   resolution,
   ratio,
   duration,
-  generateAudio,
+  model,
 }: {
   resolution: string;
   ratio: string;
   duration: number;
-  generateAudio: boolean;
+  generateAudio?: boolean;
+  model?: string;
 }) {
-  const price = calculateVideoPrice(resolution, ratio, duration, generateAudio);
+  const price = calculateVideoPrice(resolution, ratio, duration, model);
   if ("error" in price) {
     return price;
   }

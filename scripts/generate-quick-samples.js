@@ -7,7 +7,7 @@ dotenv.config({ path: '.env.local' });
 
 const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
 const endpoint = process.env.VOLCENGINE_ARK_ENDPOINT;
-const model = process.env.SEEDANCE_MODEL || "doubao-seedance-1-5-pro-251215";
+const model = process.env.SEEDANCE_MODEL || "doubao-seedance-2-0-fast-260128";
 
 // Simplified, shorter prompts for faster generation
 const quickPrompts = [
@@ -74,11 +74,9 @@ async function createGenerationTask(promptConfig) {
       resolution: promptConfig.resolution,
       duration: promptConfig.duration,
       generate_audio: promptConfig.generate_audio,
-      camera_fixed: promptConfig.camera_fixed,
-      service_tier: promptConfig.service_tier,
+      service_tier: "default",
       seed: -1,
       watermark: false,
-      draft: false,
       execution_expires_after: 86400 // 24 hours
     }),
   });
@@ -117,7 +115,11 @@ async function pollTaskStatus(taskId, maxAttempts = 30) { // Reduced max attempt
       const data = await response.json();
       console.log(`📊 Task ${taskId} status: ${data.status}`);
 
-      if (data.status === "success" || data.status === "completed") {
+      if (
+        data.status === "succeeded" ||
+        data.status === "success" ||
+        data.status === "completed"
+      ) {
         const videoUrl =
           data.output?.video_url ??
           data.output?.video_urls?.[0] ??
@@ -134,7 +136,12 @@ async function pollTaskStatus(taskId, maxAttempts = 30) { // Reduced max attempt
         }
       }
 
-      if (data.status === "failed" || data.status === "error") {
+      if (
+        data.status === "failed" ||
+        data.status === "expired" ||
+        data.status === "cancelled" ||
+        data.status === "error"
+      ) {
         throw new Error(`Task ${taskId} failed: ${JSON.stringify(data.error || data)}`);
       }
 

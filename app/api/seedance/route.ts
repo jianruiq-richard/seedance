@@ -2,7 +2,9 @@ import { NextResponse } from "next/server";
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import {
   calculateCreditCost,
+  DEFAULT_SEEDANCE_MODEL,
   DEFAULT_NEW_USER_CREDITS,
+  seedanceModels,
 } from "../../lib/credits";
 import {
   createGenerationJob,
@@ -15,10 +17,12 @@ export const runtime = "nodejs";
 
 const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
 const endpoint = process.env.VOLCENGINE_ARK_ENDPOINT;
-const model = process.env.SEEDANCE_MODEL || "doubao-seedance-1-5-pro-251215";
+const configuredModel = process.env.SEEDANCE_MODEL || DEFAULT_SEEDANCE_MODEL;
+const supportedModels = new Set<string>(seedanceModels.map((item) => item.value));
 
 type GenerateRequest = {
   mode: "text" | "image";
+  model?: string;
   prompt: string;
   imageUrl?: string | null;
   ratio?: string;
@@ -46,6 +50,7 @@ type CreditUsageEntry = {
     resolution?: string;
     duration?: number;
     generateAudio?: boolean;
+    model?: string;
   };
 };
 
@@ -65,6 +70,64 @@ function getBaseUrl() {
   return `${raw}/api/v3`;
 }
 
+function normalizeModel(input?: string | null) {
+  const value = input || configuredModel;
+  const aliases: Record<string, string> = {
+    "seedance2.0": "doubao-seedance-2-0-260128",
+    "seedance-2.0": "doubao-seedance-2-0-260128",
+    "seedance 2.0": "doubao-seedance-2-0-260128",
+    "seedance2.0-fast": "doubao-seedance-2-0-fast-260128",
+    "seedance-2.0-fast": "doubao-seedance-2-0-fast-260128",
+    "seedance 2.0 fast": "doubao-seedance-2-0-fast-260128",
+    fast: "doubao-seedance-2-0-fast-260128",
+  };
+  return aliases[value.toLowerCase()] ?? value;
+}
+
+function validateSeedance2Options({
+  model,
+  resolution,
+  ratio,
+  duration,
+  executionExpiresAfter,
+}: {
+  model: string;
+  resolution: string;
+  ratio: string;
+  duration: number;
+  executionExpiresAfter?: number;
+}) {
+  if (!supportedModels.has(model)) {
+    return `Unsupported Seedance model: ${model}`;
+  }
+  if (!["480p", "720p", "1080p"].includes(resolution)) {
+    return `Unsupported resolution: ${resolution}`;
+  }
+  if (model === "doubao-seedance-2-0-fast-260128" && resolution === "1080p") {
+    return "Seedance 2.0 Fast does not support 1080p. Use 480p or 720p.";
+  }
+  if (
+    !["16:9", "4:3", "1:1", "3:4", "9:16", "21:9", "adaptive"].includes(ratio)
+  ) {
+    return `Unsupported ratio: ${ratio}`;
+  }
+  if (
+    !Number.isInteger(duration) ||
+    (duration !== -1 && (duration < 4 || duration > 15))
+  ) {
+    return "Seedance 2.0 duration must be an integer from 4 to 15, or -1 for model-selected duration.";
+  }
+  if (
+    executionExpiresAfter !== undefined &&
+    (!Number.isInteger(executionExpiresAfter) ||
+      executionExpiresAfter < 3600 ||
+      executionExpiresAfter > 259200)
+  ) {
+    return "execution_expires_after must be an integer from 3600 to 259200 seconds.";
+  }
+  return null;
+}
+
 export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) {
@@ -81,15 +144,30 @@ export async function POST(request: Request) {
   }
 
   const body = (await request.json()) as GenerateRequest;
+  const model = normalizeModel(body.model);
   const resolution = body.resolution ?? "720p";
-  const ratio = body.ratio ?? "16:9";
-  const duration = body.duration ?? 6;
+  const ratio = body.ratio ?? "adaptive";
+  const duration = body.duration ?? 5;
   const generateAudio = body.generate_audio ?? true;
-  const creditCost = calculateCreditCost({
+  const validationError = validateSeedance2Options({
+    model,
     resolution,
     ratio,
     duration,
+    executionExpiresAfter: body.execution_expires_after,
+  });
+
+  if (validationError) {
+    return NextResponse.json({ error: validationError }, { status: 400 });
+  }
+
+  const billedDuration = duration === -1 ? 15 : duration;
+  const creditCost = calculateCreditCost({
+    resolution,
+    ratio,
+    duration: billedDuration,
     generateAudio,
+    model,
   });
 
   if ("error" in creditCost) {
@@ -148,15 +226,13 @@ export async function POST(request: Request) {
       ratio,
       resolution,
       duration,
-      frames: body.frames,
       seed: body.seed,
-      camera_fixed: body.camera_fixed,
       watermark: body.watermark,
       generate_audio: body.generate_audio,
-      draft: body.draft,
-      service_tier: body.service_tier,
+      service_tier: "default",
       execution_expires_after: body.execution_expires_after,
       return_last_frame: body.return_last_frame,
+      safety_identifier: userId,
     }),
   });
 
@@ -208,6 +284,7 @@ export async function POST(request: Request) {
             resolution,
             duration,
             generateAudio,
+            model,
           },
         },
       ].slice(-100),
@@ -285,7 +362,11 @@ export async function GET(request: Request) {
       video_urls?: string[];
       videos?: { url?: string }[];
     };
-    content?: { video_url?: string; video_urls?: string[] };
+    content?: {
+      video_url?: string;
+      video_urls?: string[];
+      last_frame_url?: string;
+    };
     result?: { video_url?: string; video_urls?: string[] };
   };
 
@@ -319,13 +400,17 @@ export async function GET(request: Request) {
         videoUrl: persistedVideoUrl,
       });
     }
-    if (data.status === "failed") {
+    if (
+      data.status === "failed" ||
+      data.status === "expired" ||
+      data.status === "cancelled"
+    ) {
       const errorMessage =
         typeof data.error === "string"
           ? data.error
           : data.error
             ? JSON.stringify(data.error)
-            : "Generation failed";
+            : `Generation ${data.status}`;
       await updateGenerationJobResult({
         id: jobId,
         clerkUserId: userId,

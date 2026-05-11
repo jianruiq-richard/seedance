@@ -5,8 +5,10 @@ import Link from "next/link";
 import { UserButton, useClerk, useUser } from "@clerk/nextjs";
 import {
   calculateCreditCost,
+  DEFAULT_SEEDANCE_MODEL,
   DEFAULT_NEW_USER_CREDITS,
   resolutions,
+  seedanceModels,
   type RatioKey,
 } from "../lib/credits";
 
@@ -20,7 +22,7 @@ const ratios = [
   { label: "Adaptive", value: "adaptive" },
 ];
 
-const durations = [4, 5, 6, 8, 10, 12];
+const durations = [4, 5, 6, 8, 10, 12, 15];
 
 type Mode = "text" | "image";
 
@@ -57,22 +59,18 @@ export default function AppPage() {
   const { signOut } = useClerk();
   const isSignedIn = Boolean(user);
   const [mode, setMode] = useState<Mode>("text");
+  const [model, setModel] = useState<string>(DEFAULT_SEEDANCE_MODEL);
   const [prompt, setPrompt] = useState(
     "Neon city streets, slow motion, cinematic glow"
   );
-  const [duration, setDuration] = useState<number>(6);
-  const [ratio, setRatio] = useState<string>("16:9");
+  const [duration, setDuration] = useState<number>(5);
+  const [ratio, setRatio] = useState<string>("adaptive");
   const [resolution, setResolution] = useState<(typeof resolutions)[number]>(
     "720p"
   );
   const [seed, setSeed] = useState<number>(-1);
-  const [cameraFixed, setCameraFixed] = useState<boolean>(false);
   const [watermark, setWatermark] = useState<boolean>(false);
   const [generateAudio, setGenerateAudio] = useState<boolean>(true);
-  const [draft, setDraft] = useState<boolean>(false);
-  const [serviceTier, setServiceTier] = useState<"default" | "flex">(
-    "default"
-  );
   const [executionExpiresAfter, setExecutionExpiresAfter] =
     useState<number>(172800);
   const [returnLastFrame, setReturnLastFrame] = useState<boolean>(false);
@@ -128,6 +126,20 @@ export default function AppPage() {
     return ratioSizeMap[normalized] ?? ratioSizeMap["16:9"];
   }, [ratio]);
 
+  const availableResolutions = useMemo(
+    () =>
+      model === "doubao-seedance-2-0-fast-260128"
+        ? resolutions.filter((item) => item !== "1080p")
+        : resolutions,
+    [model]
+  );
+
+  useEffect(() => {
+    if (model === "doubao-seedance-2-0-fast-260128" && resolution === "1080p") {
+      setResolution("720p");
+    }
+  }, [model, resolution]);
+
   useEffect(() => {
     setPricingLoading(true);
     setPricingError(null);
@@ -137,6 +149,7 @@ export default function AppPage() {
         ratio,
         duration,
         generateAudio,
+        model,
       });
       if ("error" in result) {
         setPricingError(result.error);
@@ -148,7 +161,7 @@ export default function AppPage() {
       setPricingLoading(false);
     }, 200);
     return () => clearTimeout(handle);
-  }, [resolution, ratio, duration, generateAudio]);
+  }, [resolution, ratio, duration, generateAudio, model]);
 
   useEffect(() => {
     return () => {
@@ -318,17 +331,15 @@ export default function AppPage() {
         },
         body: JSON.stringify({
           mode,
+          model,
           prompt,
           imageUrl: mode === "image" ? imageUrl : null,
           ratio,
           resolution,
           duration,
           seed,
-          camera_fixed: cameraFixed,
           watermark,
           generate_audio: generateAudio,
-          draft,
-          service_tier: serviceTier,
           execution_expires_after: executionExpiresAfter,
           return_last_frame: returnLastFrame,
         }),
@@ -375,7 +386,11 @@ export default function AppPage() {
           if (taskStatus === "succeeded" && outputUrl) {
             break;
           }
-          if (taskStatus === "failed") {
+          if (
+            taskStatus === "failed" ||
+            taskStatus === "expired" ||
+            taskStatus === "cancelled"
+          ) {
             const pollError =
               pollData?.error?.message ||
               (typeof pollData?.error === "string" ? pollData.error : "");
@@ -385,7 +400,7 @@ export default function AppPage() {
                 : JSON.stringify(pollData.detail)
               : "";
             throw new Error(
-              `${pollError || "Generation failed."}${
+              `${pollError || `Generation ${taskStatus}.`}${
                 pollDetail ? `\n${pollDetail}` : ""
               }`
             );
@@ -592,6 +607,22 @@ export default function AppPage() {
             <div className="grid gap-4">
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Model
+                </label>
+                <select
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  value={model}
+                  onChange={(event) => setModel(event.target.value)}
+                >
+                  {seedanceModels.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
                   Resolution
                 </label>
                 <select
@@ -601,7 +632,7 @@ export default function AppPage() {
                     setResolution(event.target.value as typeof resolution)
                   }
                 >
-                  {resolutions.map((item) => (
+                  {availableResolutions.map((item) => (
                     <option key={item} value={item}>
                       {item}
                     </option>
@@ -663,14 +694,6 @@ export default function AppPage() {
               </div>
               <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-xs text-white/70">
                 <label className="flex items-center justify-between gap-2">
-                  Camera fixed
-                  <input
-                    type="checkbox"
-                    checked={cameraFixed}
-                    onChange={(event) => setCameraFixed(event.target.checked)}
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-2">
                   Watermark
                   <input
                     type="checkbox"
@@ -687,14 +710,6 @@ export default function AppPage() {
                   />
                 </label>
                 <label className="flex items-center justify-between gap-2">
-                  Draft mode
-                  <input
-                    type="checkbox"
-                    checked={draft}
-                    onChange={(event) => setDraft(event.target.checked)}
-                  />
-                </label>
-                <label className="flex items-center justify-between gap-2">
                   Return last frame
                   <input
                     type="checkbox"
@@ -704,21 +719,6 @@ export default function AppPage() {
                     }
                   />
                 </label>
-              </div>
-              <div>
-                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
-                  Service tier
-                </label>
-                <select
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
-                  value={serviceTier}
-                  onChange={(event) =>
-                    setServiceTier(event.target.value as "default" | "flex")
-                  }
-                >
-                  <option value="default">default</option>
-                  <option value="flex">flex</option>
-                </select>
               </div>
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
