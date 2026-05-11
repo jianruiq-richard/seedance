@@ -105,6 +105,9 @@ export default function AppPage() {
   const [referenceUrls, setReferenceUrls] = useState<Record<MediaKind, string>>(
     emptyMediaRecord("")
   );
+  const [referenceDurations, setReferenceDurations] = useState<
+    Record<MediaKind, number>
+  >(emptyMediaRecord(0));
   const [uploadProgress, setUploadProgress] = useState<Record<MediaKind, number>>(
     emptyMediaRecord(0)
   );
@@ -185,6 +188,7 @@ export default function AppPage() {
         duration,
         generateAudio,
         model,
+        inputVideoDuration: referenceUrls.video ? referenceDurations.video : 0,
       });
       if ("error" in result) {
         setPricingError(result.error);
@@ -196,7 +200,15 @@ export default function AppPage() {
       setPricingLoading(false);
     }, 200);
     return () => clearTimeout(handle);
-  }, [resolution, ratio, duration, generateAudio, model]);
+  }, [
+    resolution,
+    ratio,
+    duration,
+    generateAudio,
+    model,
+    referenceUrls.video,
+    referenceDurations.video,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -332,6 +344,7 @@ export default function AppPage() {
     setReferenceFiles((prev) => ({ ...prev, [kind]: file }));
     setReferencePreviews((prev) => ({ ...prev, [kind]: previewUrl }));
     setReferenceUrls((prev) => ({ ...prev, [kind]: "" }));
+    setReferenceDurations((prev) => ({ ...prev, [kind]: 0 }));
     setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
     void uploadReferenceFile(kind, file, token);
   };
@@ -345,6 +358,7 @@ export default function AppPage() {
     setReferenceFiles((prev) => ({ ...prev, [kind]: null }));
     setReferencePreviews((prev) => ({ ...prev, [kind]: null }));
     setReferenceUrls((prev) => ({ ...prev, [kind]: "" }));
+    setReferenceDurations((prev) => ({ ...prev, [kind]: 0 }));
     setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
     setUploading((prev) => ({ ...prev, [kind]: false }));
     setErrorMessage(null);
@@ -386,6 +400,10 @@ export default function AppPage() {
       setErrorMessage("Audio must be combined with an image or video reference.");
       return;
     }
+    if (hasVideo && referenceDurations.video <= 0) {
+      setErrorMessage("Wait for the input video duration to load.");
+      return;
+    }
     setStatus("generating");
     setVideoUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
@@ -408,6 +426,7 @@ export default function AppPage() {
           imageUrl: hasImage ? referenceUrls.image : null,
           videoUrl: hasVideo ? referenceUrls.video : null,
           audioUrl: hasAudio ? referenceUrls.audio : null,
+          inputVideoDuration: hasVideo ? referenceDurations.video : 0,
           ratio,
           resolution,
           duration,
@@ -652,6 +671,16 @@ export default function AppPage() {
                             muted
                             playsInline
                             preload="metadata"
+                            onLoadedMetadata={(event) => {
+                              const nextDuration =
+                                event.currentTarget.duration;
+                              if (Number.isFinite(nextDuration)) {
+                                setReferenceDurations((prev) => ({
+                                  ...prev,
+                                  video: nextDuration,
+                                }));
+                              }
+                            }}
                           />
                         )}
                         {kind === "audio" && (

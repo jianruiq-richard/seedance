@@ -28,6 +28,7 @@ type GenerateRequest = {
   imageUrl?: string | null;
   videoUrl?: string | null;
   audioUrl?: string | null;
+  inputVideoDuration?: number;
   ratio?: string;
   resolution?: string;
   duration?: number;
@@ -51,6 +52,7 @@ type CreditUsageEntry = {
     ratio?: string;
     resolution?: string;
     duration?: number;
+    inputVideoDuration?: number;
     generateAudio?: boolean;
     model?: string;
   };
@@ -186,6 +188,7 @@ export async function POST(request: Request) {
   const imageUrl = body.imageUrl?.trim() || null;
   const videoUrl = body.videoUrl?.trim() || null;
   const audioUrl = body.audioUrl?.trim() || null;
+  const inputVideoDuration = videoUrl ? Number(body.inputVideoDuration ?? 0) : 0;
   const contentValidationError = validateContentCombination({
     prompt,
     imageUrl,
@@ -204,6 +207,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: contentValidationError }, { status: 400 });
   }
 
+  if (
+    videoUrl &&
+    (!Number.isFinite(inputVideoDuration) || inputVideoDuration <= 0)
+  ) {
+    return NextResponse.json(
+      { error: "Input video duration is required for video references." },
+      { status: 400 }
+    );
+  }
+
   if (validationError) {
     return NextResponse.json({ error: validationError }, { status: 400 });
   }
@@ -215,6 +228,7 @@ export async function POST(request: Request) {
     duration: billedDuration,
     generateAudio,
     model,
+    inputVideoDuration,
   });
 
   if ("error" in creditCost) {
@@ -346,6 +360,7 @@ export async function POST(request: Request) {
             ratio,
             resolution,
             duration,
+            inputVideoDuration,
             generateAudio,
             model,
           },
