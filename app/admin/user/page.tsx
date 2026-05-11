@@ -1,5 +1,6 @@
 import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { updateUserCreditsWithLog } from "../users/actions";
 
 export const dynamic = "force-dynamic";
@@ -147,6 +148,7 @@ export default async function AdminUserDetailPage({ searchParams }: PageProps) {
                   primaryEmail,
                   reason || "Manual adjustment"
                 );
+                redirect(`/admin/user?userId=${encodeURIComponent(userId)}`);
               }}
               className="flex flex-col gap-2 sm:flex-row sm:items-center"
             >
