@@ -27,17 +27,23 @@ function parsePageSize(value: string | undefined) {
     : 50;
 }
 
-async function getUsersPage(page: number, pageSize: number) {
+function parseSearchQuery(value: string | undefined) {
+  return (value ?? "").trim();
+}
+
+async function getUsersPage(page: number, pageSize: number, query: string) {
   const client = await clerkClient();
   return client.users.getUserList({
     limit: pageSize,
     offset: (page - 1) * pageSize,
     orderBy: "-created_at",
+    query: query && !query.startsWith("user_") ? query : undefined,
+    userId: query.startsWith("user_") ? [query] : undefined,
   });
 }
 
 type PageProps = {
-  searchParams: Promise<{ page?: string; pageSize?: string }>;
+  searchParams: Promise<{ page?: string; pageSize?: string; q?: string }>;
 };
 
 export default async function AdminUsersPage({ searchParams }: PageProps) {
@@ -59,19 +65,28 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
 
   const resolvedParams = await searchParams;
   const pageSize = parsePageSize(resolvedParams.pageSize);
+  const query = parseSearchQuery(resolvedParams.q);
   const requestedPage = parsePositiveInt(resolvedParams.page, 1);
-  let users = await getUsersPage(requestedPage, pageSize);
+  let users = await getUsersPage(requestedPage, pageSize, query);
   const totalPages = Math.max(1, Math.ceil(users.totalCount / pageSize));
   const page = Math.min(requestedPage, totalPages);
   if (page !== requestedPage) {
-    users = await getUsersPage(page, pageSize);
+    users = await getUsersPage(page, pageSize, query);
   }
 
   const displayedStart =
     users.totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const displayedEnd = Math.min(page * pageSize, users.totalCount);
-  const pageHref = (nextPage: number) =>
-    `/admin/users?page=${nextPage}&pageSize=${pageSize}`;
+  const pageHref = (nextPage: number) => {
+    const params = new URLSearchParams({
+      page: String(nextPage),
+      pageSize: String(pageSize),
+    });
+    if (query) {
+      params.set("q", query);
+    }
+    return `/admin/users?${params.toString()}`;
+  };
 
   return (
     <div className="min-h-screen bg-[#0a0b10] text-white">
@@ -83,7 +98,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           <h1 className="mt-3 text-3xl font-semibold">Users & Credits</h1>
           <p className="mt-2 text-sm text-white/60">
             Showing {displayedStart}-{displayedEnd} of {users.totalCount} Clerk
-            users.
+            users{query ? ` matching "${query}"` : ""}.
           </p>
         </div>
 
@@ -91,6 +106,18 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
           className="mb-6 flex flex-wrap items-end gap-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70"
           method="get"
         >
+          <label className="grid min-w-[260px] flex-1 gap-2">
+            <span className="text-xs uppercase tracking-[0.2em] text-white/40">
+              Search
+            </span>
+            <input
+              className="rounded-full border border-white/20 bg-black/30 px-4 py-2 text-white/80 outline-none placeholder:text-white/30"
+              name="q"
+              type="search"
+              defaultValue={query}
+              placeholder="Email, name, username, or exact user id"
+            />
+          </label>
           <label className="grid gap-2">
             <span className="text-xs uppercase tracking-[0.2em] text-white/40">
               Per page
@@ -124,8 +151,16 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
             className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0a0b10]"
             type="submit"
           >
-            Go
+            Search / Go
           </button>
+          {query && (
+            <Link
+              className="rounded-full border border-white/20 px-4 py-2 text-xs text-white/70 transition hover:border-white/60 hover:text-white"
+              href={`/admin/users?page=1&pageSize=${pageSize}`}
+            >
+              Clear
+            </Link>
+          )}
           <div className="ml-auto flex items-center gap-2 text-xs">
             <Link
               aria-disabled={page <= 1}
