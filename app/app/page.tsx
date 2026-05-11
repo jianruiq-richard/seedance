@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { UserButton, useClerk, useUser } from "@clerk/nextjs";
 import {
@@ -23,6 +23,25 @@ const ratios = [
 const durations = [4, 5, 6, 8, 10, 12];
 
 type Mode = "text" | "image";
+
+type GenerationHistoryItem = {
+  id: string;
+  upstreamTaskId: string | null;
+  mode: Mode;
+  prompt: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  downloadUrl: string | null;
+  status: "queued" | "succeeded" | "failed";
+  creditsCharged: number;
+  ratio: string | null;
+  resolution: string | null;
+  duration: number | null;
+  generateAudio: boolean | null;
+  errorMessage: string | null;
+  createdAt: string;
+  completedAt: string | null;
+};
 
 const ratioSizeMap: Record<RatioKey, { width: number; height: number }> = {
   "16:9": { width: 960, height: 540 },
@@ -71,13 +90,16 @@ export default function AppPage() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [seedKey, setSeedKey] = useState<number>(Date.now());
-  const [lastGeneratedAt, setLastGeneratedAt] = useState<string>("");
 
   const [credits, setCredits] = useState<number>(600);
   const [pricingCredits, setPricingCredits] = useState<number>(100);
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [pricingLoading, setPricingLoading] = useState<boolean>(false);
   const [subscriptionSuccess, setSubscriptionSuccess] = useState<boolean>(false);
+  const [historyItems, setHistoryItems] = useState<GenerationHistoryItem[]>([]);
+  const [historyNextCursor, setHistoryNextCursor] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState<boolean>(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
 
   useEffect(() => {
     const nextCredits =
@@ -150,6 +172,48 @@ export default function AppPage() {
     void handleUpload();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imageFile]);
+
+  const loadGenerationHistory = useCallback(
+    async ({ reset = false }: { reset?: boolean } = {}) => {
+      if (!isSignedIn) {
+        setHistoryItems([]);
+        setHistoryNextCursor(null);
+        return;
+      }
+
+      setHistoryLoading(true);
+      setHistoryError(null);
+      try {
+        const params = new URLSearchParams({ limit: "10" });
+        if (!reset && historyNextCursor) {
+          params.set("cursor", historyNextCursor);
+        }
+        const response = await fetch(`/api/generations?${params.toString()}`);
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.error || "Failed to load generation history.");
+        }
+        setHistoryItems((prev) =>
+          reset ? data.items ?? [] : [...prev, ...(data.items ?? [])]
+        );
+        setHistoryNextCursor(data.nextCursor ?? null);
+      } catch (error) {
+        setHistoryError(
+          error instanceof Error
+            ? error.message
+            : "Failed to load generation history."
+        );
+      } finally {
+        setHistoryLoading(false);
+      }
+    },
+    [historyNextCursor, isSignedIn]
+  );
+
+  useEffect(() => {
+    void loadGenerationHistory({ reset: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSignedIn, user?.id]);
 
   const handleUpload = async () => {
     if (!imageFile) return;
@@ -294,13 +358,16 @@ export default function AppPage() {
       let taskStatus = data?.status ?? "queued";
       let outputUrl = data?.videoUrl ?? null;
       const taskId = data?.taskId ?? null;
+      const jobId = data?.jobId ?? null;
 
       if (!outputUrl && taskId) {
         for (let i = 0; i < 40; i += 1) {
           await new Promise((resolve) => setTimeout(resolve, 3000));
-          const pollResponse = await fetch(
-            `/api/seedance?taskId=${encodeURIComponent(taskId)}`
-          );
+          const pollParams = new URLSearchParams({ taskId });
+          if (jobId) {
+            pollParams.set("jobId", jobId);
+          }
+          const pollResponse = await fetch(`/api/seedance?${pollParams}`);
           const pollData = await pollResponse.json();
           taskStatus = pollData?.status ?? taskStatus;
           outputUrl = pollData?.videoUrl ?? null;
@@ -330,12 +397,12 @@ export default function AppPage() {
         setVideoUrl(outputUrl);
         setDownloadUrl(outputUrl);
         setStatus("ready");
-        setLastGeneratedAt(new Date().toLocaleString());
       } else {
         throw new Error("Generation timed out. Please try again.");
       }
 
       setSeedKey(Date.now());
+      void loadGenerationHistory({ reset: true });
     } catch (error) {
       setStatus("error");
       setErrorMessage(
@@ -748,22 +815,88 @@ export default function AppPage() {
           <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
             <div className="flex items-center justify-between text-xs text-white/50">
               <span>Generation log</span>
-              <span>Most recent</span>
+              <span>{historyItems.length} loaded</span>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-white">
-                  {mode === "text" ? "Text to Video" : "Image to Video"}
-                </span>
-              <span className="text-xs text-white/40">
-                {lastGeneratedAt || "—"}
-              </span>
+            {historyError && (
+              <p className="text-xs text-rose-200">{historyError}</p>
+            )}
+            {historyItems.length === 0 && !historyLoading ? (
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-xs text-white/45">
+                No saved generations yet.
               </div>
-              <p className="mt-2 text-xs text-white/50">{prompt}</p>
-              <div className="mt-3 text-xs text-white/40">
-                {resolution} · {ratio} · {duration}s
+            ) : (
+              <div className="grid gap-3">
+                {historyItems.map((item) => {
+                  const playableUrl = item.videoUrl ?? item.downloadUrl;
+                  const itemRatio = item.ratio ?? "16:9";
+                  return (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-white/10 bg-black/20 p-4"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <span className="text-white">
+                            {item.mode === "text"
+                              ? "Text to Video"
+                              : "Image to Video"}
+                          </span>
+                          <span className="ml-2 rounded-full border border-white/15 px-2 py-1 text-[11px] text-white/45">
+                            {item.status}
+                          </span>
+                        </div>
+                        <span className="text-xs text-white/40">
+                          {new Date(item.createdAt).toLocaleString()}
+                        </span>
+                      </div>
+                      {playableUrl && (
+                        <video
+                          className="mt-3 max-h-[280px] w-full rounded-2xl bg-black/40"
+                          src={playableUrl}
+                          controls
+                          preload="metadata"
+                        />
+                      )}
+                      <p className="mt-3 text-xs text-white/50">
+                        {item.prompt}
+                      </p>
+                      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-xs text-white/40">
+                        <div className="flex flex-wrap gap-3">
+                          <span>{item.resolution ?? "—"}</span>
+                          <span>{itemRatio}</span>
+                          <span>{item.duration ?? "—"}s</span>
+                          <span>{item.creditsCharged} credits</span>
+                        </div>
+                        {item.downloadUrl && (
+                          <a
+                            className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0a0b10]"
+                            href={item.downloadUrl}
+                            download={`seedance-${item.mode}-${itemRatio}.mp4`}
+                          >
+                            Download
+                          </a>
+                        )}
+                      </div>
+                      {item.errorMessage && (
+                        <p className="mt-2 text-xs text-rose-200">
+                          {item.errorMessage}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
+            )}
+            {historyNextCursor && (
+              <button
+                className="rounded-full border border-white/20 px-4 py-2 text-xs text-white/80 transition hover:border-white/60 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+                onClick={() => void loadGenerationHistory()}
+                disabled={historyLoading}
+              >
+                {historyLoading ? "Loading..." : "Load more"}
+              </button>
+            )}
           </div>
         </section>
       </div>

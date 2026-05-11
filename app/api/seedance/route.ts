@@ -4,6 +4,12 @@ import {
   calculateCreditCost,
   DEFAULT_NEW_USER_CREDITS,
 } from "../../lib/credits";
+import {
+  createGenerationJob,
+  getGenerationJobForUser,
+  updateGenerationJobResult,
+} from "../../lib/generation-jobs";
+import { archiveVideoToTos } from "../../lib/tos";
 
 export const runtime = "nodejs";
 
@@ -167,6 +173,19 @@ export async function POST(request: Request) {
   }
 
   const data = (await response.json()) as { id?: string };
+  const taskId = data.id ?? null;
+  const generationJob = await createGenerationJob({
+    clerkUserId: userId,
+    upstreamTaskId: taskId,
+    mode: body.mode,
+    prompt: body.prompt,
+    imageUrl: body.mode === "image" ? body.imageUrl ?? null : null,
+    creditsCharged: creditCost.credits,
+    ratio,
+    resolution,
+    duration,
+    generateAudio,
+  });
   const updatedCredits = Math.max(currentCredits - creditCost.credits, 0);
   const usageLog =
     (clerkUser.unsafeMetadata?.creditUsage as CreditUsageEntry[] | undefined) ??
@@ -182,7 +201,7 @@ export async function POST(request: Request) {
           at: new Date().toISOString(),
           amount: -creditCost.credits,
           note: `Generate (${body.mode})`,
-          taskId: data.id ?? null,
+          taskId,
           prompt: body.prompt.slice(0, 240),
           params: {
             ratio,
@@ -196,7 +215,8 @@ export async function POST(request: Request) {
   });
 
   return NextResponse.json({
-    taskId: data.id ?? null,
+    jobId: generationJob.id,
+    taskId,
     status: "queued",
     creditsCharged: creditCost.credits,
     creditsRemaining: updatedCredits,
@@ -204,6 +224,11 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
+  const { userId } = await auth();
+  if (!userId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
     requireConfig();
   } catch (error) {
@@ -214,7 +239,17 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url);
-  const taskId = searchParams.get("taskId");
+  const jobId = searchParams.get("jobId");
+  let taskId = searchParams.get("taskId");
+
+  if (jobId) {
+    const job = await getGenerationJobForUser(jobId, userId);
+    if (!job) {
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
+    }
+    taskId = job.upstreamTaskId;
+  }
+
   if (!taskId) {
     return NextResponse.json({ error: "Missing taskId" }, { status: 400 });
   }
@@ -264,9 +299,45 @@ export async function GET(request: Request) {
     data.result?.video_urls?.[0] ??
     null;
 
+  let persistedVideoUrl = videoUrl;
+
+  if (jobId) {
+    if (data.status === "succeeded" && videoUrl) {
+      try {
+        persistedVideoUrl = await archiveVideoToTos({
+          sourceUrl: videoUrl,
+          userId,
+          jobId,
+        });
+      } catch (error) {
+        console.error("Failed to archive generated video:", error);
+      }
+      await updateGenerationJobResult({
+        id: jobId,
+        clerkUserId: userId,
+        status: "succeeded",
+        videoUrl: persistedVideoUrl,
+      });
+    }
+    if (data.status === "failed") {
+      const errorMessage =
+        typeof data.error === "string"
+          ? data.error
+          : data.error
+            ? JSON.stringify(data.error)
+            : "Generation failed";
+      await updateGenerationJobResult({
+        id: jobId,
+        clerkUserId: userId,
+        status: "failed",
+        errorMessage,
+      });
+    }
+  }
+
   return NextResponse.json({
     status: data.status ?? "unknown",
-    videoUrl,
+    videoUrl: persistedVideoUrl,
     error: data.error ?? null,
     raw: data,
   });
