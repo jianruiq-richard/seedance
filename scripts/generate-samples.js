@@ -19,8 +19,7 @@ const samplePrompts = [
     ratio: "16:9",
     resolution: "720p",
     generate_audio: true,
-    camera_fixed: false,
-    service_tier: "default"
+    camera_fixed: false
   },
   {
     id: "ocean-sunset",
@@ -30,8 +29,7 @@ const samplePrompts = [
     ratio: "16:9",
     resolution: "720p",
     generate_audio: true,
-    camera_fixed: false,
-    service_tier: "default"
+    camera_fixed: false
   },
   {
     id: "space-nebula",
@@ -41,8 +39,7 @@ const samplePrompts = [
     ratio: "16:9",
     resolution: "720p",
     generate_audio: true,
-    camera_fixed: false,
-    service_tier: "default"
+    camera_fixed: false
   }
 ];
 
@@ -74,7 +71,6 @@ async function createGenerationTask(promptConfig) {
       resolution: promptConfig.resolution,
       duration: promptConfig.duration,
       generate_audio: promptConfig.generate_audio,
-      service_tier: "default",
       seed: -1, // Random seed for variety
       watermark: false,
       execution_expires_after: 172800 // 48 hours

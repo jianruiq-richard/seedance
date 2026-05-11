@@ -34,7 +34,6 @@ type GenerateRequest = {
   watermark?: boolean;
   generate_audio?: boolean;
   draft?: boolean;
-  service_tier?: "default" | "flex";
   execution_expires_after?: number;
   return_last_frame?: boolean;
 };
@@ -76,9 +75,11 @@ function normalizeModel(input?: string | null) {
     "seedance2.0": "doubao-seedance-2-0-260128",
     "seedance-2.0": "doubao-seedance-2-0-260128",
     "seedance 2.0": "doubao-seedance-2-0-260128",
+    "doubao-seedance-2-0": "doubao-seedance-2-0-260128",
     "seedance2.0-fast": "doubao-seedance-2-0-fast-260128",
     "seedance-2.0-fast": "doubao-seedance-2-0-fast-260128",
     "seedance 2.0 fast": "doubao-seedance-2-0-fast-260128",
+    "doubao-seedance-2-0-fast": "doubao-seedance-2-0-fast-260128",
     fast: "doubao-seedance-2-0-fast-260128",
   };
   return aliases[value.toLowerCase()] ?? value;
@@ -229,7 +230,6 @@ export async function POST(request: Request) {
       seed: body.seed,
       watermark: body.watermark,
       generate_audio: body.generate_audio,
-      service_tier: "default",
       execution_expires_after: body.execution_expires_after,
       return_last_frame: body.return_last_frame,
       safety_identifier: userId,

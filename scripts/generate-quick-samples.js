@@ -19,8 +19,7 @@ const quickPrompts = [
     ratio: "16:9",
     resolution: "720p",
     generate_audio: false, // Disable audio for faster generation
-    camera_fixed: true,   // Fixed camera for simpler generation
-    service_tier: "default" // Use default tier for speed
+    camera_fixed: true   // Fixed camera for simpler generation
   },
   {
     id: "ocean-waves",
@@ -30,8 +29,7 @@ const quickPrompts = [
     ratio: "16:9",
     resolution: "720p",
     generate_audio: false,
-    camera_fixed: true,
-    service_tier: "default"
+    camera_fixed: true
   },
   {
     id: "space-stars",
@@ -41,8 +39,7 @@ const quickPrompts = [
     ratio: "16:9",
     resolution: "720p",
     generate_audio: false,
-    camera_fixed: true,
-    service_tier: "default"
+    camera_fixed: true
   }
 ];
 
@@ -74,7 +71,6 @@ async function createGenerationTask(promptConfig) {
       resolution: promptConfig.resolution,
       duration: promptConfig.duration,
       generate_audio: promptConfig.generate_audio,
-      service_tier: "default",
       seed: -1,
       watermark: false,
       execution_expires_after: 86400 // 24 hours
