@@ -14,6 +14,8 @@ import {
 import { archiveVideoToTos } from "../../lib/tos";
 
 export const runtime = "nodejs";
+export const preferredRegion = "hnd1";
+export const maxDuration = 300;
 
 const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
 const endpoint = process.env.VOLCENGINE_ARK_ENDPOINT;
