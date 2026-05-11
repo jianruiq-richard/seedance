@@ -84,10 +84,10 @@ export default function AppPage() {
   const [prompt, setPrompt] = useState(
     "Neon city streets, slow motion, cinematic glow"
   );
-  const [duration, setDuration] = useState<number>(5);
-  const [ratio, setRatio] = useState<string>("adaptive");
+  const [duration, setDuration] = useState<number>(4);
+  const [ratio, setRatio] = useState<string>("16:9");
   const [resolution, setResolution] = useState<(typeof resolutions)[number]>(
-    "720p"
+    "480p"
   );
   const [seed, setSeed] = useState<number>(-1);
   const [watermark, setWatermark] = useState<boolean>(false);
@@ -124,7 +124,7 @@ export default function AppPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [seedKey, setSeedKey] = useState<number>(Date.now());
 
-  const [credits, setCredits] = useState<number>(600);
+  const [credits, setCredits] = useState<number>(DEFAULT_NEW_USER_CREDITS);
   const [pricingCredits, setPricingCredits] = useState<number>(100);
   const [pricingError, setPricingError] = useState<string | null>(null);
   const [pricingLoading, setPricingLoading] = useState<boolean>(false);

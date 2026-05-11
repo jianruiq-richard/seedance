@@ -181,9 +181,9 @@ export async function POST(request: Request) {
   const body = (await request.json()) as GenerateRequest;
   const prompt = body.prompt?.trim() ?? "";
   const model = normalizeModel(body.model);
-  const resolution = body.resolution ?? "720p";
-  const ratio = body.ratio ?? "adaptive";
-  const duration = body.duration ?? 5;
+  const resolution = body.resolution ?? "480p";
+  const ratio = body.ratio ?? "16:9";
+  const duration = body.duration ?? 4;
   const generateAudio = body.generate_audio ?? true;
   const imageUrl = body.imageUrl?.trim() || null;
   const videoUrl = body.videoUrl?.trim() || null;

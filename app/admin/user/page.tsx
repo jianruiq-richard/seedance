@@ -2,6 +2,7 @@ import { clerkClient, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { updateUserCreditsWithLog } from "../users/actions";
+import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
 export const dynamic = "force-dynamic";
 
@@ -80,7 +81,8 @@ export default async function AdminUserDetailPage({ searchParams }: PageProps) {
   const email = target.emailAddresses?.[0]?.emailAddress ?? "—";
   const name = target.fullName ?? target.username ?? "Unnamed";
   const credits =
-    (target.unsafeMetadata?.credits as number | undefined) ?? 600;
+    (target.unsafeMetadata?.credits as number | undefined) ??
+    DEFAULT_NEW_USER_CREDITS;
   const adjustmentLog =
     (target.unsafeMetadata?.creditAdjustments as
       | {

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
+import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
 export default function TestCreditsPage() {
   const { user } = useUser();
@@ -34,7 +35,9 @@ export default function TestCreditsPage() {
     }
   };
 
-  const credits = (user?.unsafeMetadata?.credits as number | undefined) ?? 600;
+  const credits =
+    (user?.unsafeMetadata?.credits as number | undefined) ??
+    DEFAULT_NEW_USER_CREDITS;
   const currentPlan = user?.unsafeMetadata?.currentPlan as string | undefined;
 
   return (

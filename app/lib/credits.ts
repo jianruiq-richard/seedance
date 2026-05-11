@@ -1,4 +1,4 @@
-export const DEFAULT_NEW_USER_CREDITS = 600;
+export const DEFAULT_NEW_USER_CREDITS = 800;
 
 const DEFAULT_FPS = 24;
 const PRICE_OVER_COST = 2;

@@ -1,6 +1,7 @@
 "use server";
 
 import { clerkClient } from "@clerk/nextjs/server";
+import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
 function isAdminEmail(email: string | null) {
   if (!email) return false;
@@ -25,7 +26,8 @@ export async function updateUserCreditsWithLog(
   const client = await clerkClient();
   const user = await client.users.getUser(userId);
   const beforeCredits =
-    (user.unsafeMetadata?.credits as number | undefined) ?? 600;
+    (user.unsafeMetadata?.credits as number | undefined) ??
+    DEFAULT_NEW_USER_CREDITS;
   const existingLog =
     (user.unsafeMetadata?.creditAdjustments as
       | {

@@ -3,11 +3,13 @@
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import StripeSubscription from "@/app/components/StripeSubscription";
+import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
 export default function BillingPage() {
   const { user } = useUser();
   const credits =
-    (user?.unsafeMetadata?.credits as number | undefined) ?? 600;
+    (user?.unsafeMetadata?.credits as number | undefined) ??
+    DEFAULT_NEW_USER_CREDITS;
   const currentPlan = user?.unsafeMetadata?.currentPlan as string | undefined;
   const subscriptionStatus = user?.unsafeMetadata?.subscriptionStatus as string | undefined;
 

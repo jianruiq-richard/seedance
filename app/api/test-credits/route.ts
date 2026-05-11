@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/nextjs/server";
+import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
 export const runtime = "nodejs";
 
@@ -19,7 +20,9 @@ export async function POST(request: Request) {
     const user = await client.users.getUser(userId);
 
     // 获取当前积分，然后增加
-    const currentCredits = (user.unsafeMetadata?.credits as number) || 600;
+    const currentCredits =
+      (user.unsafeMetadata?.credits as number | undefined) ??
+      DEFAULT_NEW_USER_CREDITS;
     const newCredits = currentCredits + (credits || 5000);
 
     await client.users.updateUser(userId, {
