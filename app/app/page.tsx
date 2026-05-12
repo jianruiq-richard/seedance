@@ -556,12 +556,14 @@ export default function AppPage() {
   return (
     <div className="min-h-screen bg-[#0a0b10] text-white">
       <div className="border-b border-white/10 bg-[#0c0f18]">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="flex min-w-0 items-center gap-3">
             <span className="inline-flex h-2 w-2 rounded-full bg-[#f7c578]" />
-            <span className="text-lg font-semibold">Seedance Studio</span>
+            <span className="truncate text-base font-semibold sm:text-lg">
+              Seedance Studio
+            </span>
           </div>
-          <div className="flex items-center gap-4 text-sm text-white/70">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 text-sm text-white/70 sm:flex-none sm:gap-4">
             <Link className="hover:text-white" href="/">
               Home
             </Link>
@@ -572,10 +574,10 @@ export default function AppPage() {
                   <span className="font-semibold text-white">{credits}</span>
                 </div>
                 <Link
-                  className="rounded-full bg-[#f7c578] px-4 py-2 text-xs font-semibold text-[#0a0b10] transition hover:bg-[#f7c578]/90"
+                  className="rounded-full bg-[#f7c578] px-3 py-2 text-xs font-semibold text-[#0a0b10] transition hover:bg-[#f7c578]/90 sm:px-4"
                   href="/billing"
                 >
-                  Subscribe
+                  Billing
                 </Link>
                 <div className="flex items-center gap-2">
                   <UserButton
@@ -586,7 +588,7 @@ export default function AppPage() {
                     }}
                   />
                   <button
-                    className="rounded-full border border-white/20 px-3 py-1 text-xs text-white/80 transition hover:border-white/60 hover:text-white"
+                    className="hidden rounded-full border border-white/20 px-3 py-1 text-xs text-white/80 transition hover:border-white/60 hover:text-white sm:inline-flex"
                     onClick={() => signOut()}
                     type="button"
                   >
@@ -608,11 +610,11 @@ export default function AppPage() {
 
       {/* Subscription Success Banner */}
       {subscriptionSuccess && (
-        <div className="mx-auto w-full max-w-6xl px-6 pt-4">
+        <div className="mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6">
           <div className="rounded-2xl border border-green-500/20 bg-green-500/10 p-4 text-center">
             <div className="flex items-center justify-center gap-2">
               <span className="text-2xl">🎉</span>
-              <h3 className="text-lg font-semibold text-green-400">
+              <h3 className="text-base font-semibold text-green-400 sm:text-lg">
                 Subscription Successful!
               </h3>
             </div>
@@ -623,14 +625,14 @@ export default function AppPage() {
         </div>
       )}
 
-      <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-10 lg:grid-cols-[360px_1fr]">
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-          <div className="mt-6 space-y-4">
+      <div className="mx-auto grid w-full max-w-6xl gap-5 px-4 py-5 sm:gap-8 sm:px-6 sm:py-10 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <section className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur sm:rounded-3xl sm:p-6">
+          <div className="space-y-4 sm:mt-2">
             <label className="text-xs uppercase tracking-[0.2em] text-white/50">
               Prompt
             </label>
             <textarea
-              className="h-28 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/90 outline-none focus:border-white/40"
+              className="h-28 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/90 outline-none focus:border-white/40 sm:h-32"
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
             />
@@ -640,7 +642,7 @@ export default function AppPage() {
                 References
               </label>
               <label
-                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-6 text-center text-xs transition ${
+                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-5 text-center text-xs transition sm:py-6 ${
                   dragActive
                     ? "border-white/80 bg-white/5 text-white"
                     : "border-white/20 bg-black/20 text-white/60 hover:border-white/50"
@@ -728,7 +730,7 @@ export default function AppPage() {
                         </div>
                       </div>
                       <button
-                        className="rounded-full border border-white/20 px-3 py-1 text-[11px] text-white/80 transition hover:border-white/60 hover:text-white"
+                        className="shrink-0 rounded-full border border-white/20 px-3 py-1 text-[11px] text-white/80 transition hover:border-white/60 hover:text-white"
                         type="button"
                         onClick={() => handleRemoveReference(kind)}
                       >
@@ -793,11 +795,11 @@ export default function AppPage() {
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
                   Ratio
                 </label>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
                   {ratios.map((item) => (
                     <button
                       key={item.value}
-                      className={`rounded-full border px-4 py-2 text-xs transition ${
+                      className={`rounded-full border px-3 py-2 text-xs transition sm:px-4 ${
                         ratio === item.value
                           ? "border-white bg-white text-[#0a0b10]"
                           : "border-white/20 text-white/70"
@@ -814,11 +816,11 @@ export default function AppPage() {
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
                   Duration (seconds)
                 </label>
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2 grid grid-cols-4 gap-2 sm:flex sm:flex-wrap">
                   {durations.map((item) => (
                     <button
                       key={item}
-                      className={`rounded-full border px-4 py-2 text-xs transition ${
+                      className={`rounded-full border px-3 py-2 text-xs transition sm:px-4 ${
                         duration === item
                           ? "border-white bg-white text-[#0a0b10]"
                           : "border-white/20 text-white/70"
@@ -929,8 +931,8 @@ export default function AppPage() {
           </div>
         </section>
 
-        <section className="space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6 backdrop-blur">
+        <section className="space-y-5 sm:space-y-6">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur sm:rounded-3xl sm:p-6">
             <div className="flex items-center justify-between text-xs text-white/60">
               <span>Preview</span>
               <span className="rounded-full border border-white/20 px-2 py-1">
@@ -938,25 +940,25 @@ export default function AppPage() {
               </span>
             </div>
             <div
-              className="relative mt-4 flex min-h-[320px] items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/20"
+              className="relative mt-4 flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/20 sm:min-h-[320px]"
               style={{ aspectRatio: `${aspectSize.width}/${aspectSize.height}` }}
             >
               {videoUrl ? (
                 <video
                   key={seedKey}
-                  className="max-h-[360px] w-full rounded-2xl bg-black/40"
+                  className="max-h-[70vh] w-full rounded-2xl bg-black/40 sm:max-h-[360px]"
                   src={videoUrl}
                   controls
                   loop
                 />
               ) : status === "generating" ? (
-                <div className="relative flex h-full min-h-[320px] w-full items-center justify-center overflow-hidden">
+                <div className="relative flex h-full min-h-[220px] w-full items-center justify-center overflow-hidden sm:min-h-[320px]">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(247,197,120,0.16),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%)]" />
                   <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,white_1px,transparent_1px)] bg-[length:22px_22px]" />
                   <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f7c578]/10 blur-3xl" />
 
                   <div className="relative z-10 flex flex-col items-center px-6 text-center">
-                    <div className="relative grid h-36 w-36 place-items-center">
+                    <div className="relative grid h-28 w-28 place-items-center sm:h-36 sm:w-36">
                       <div
                         className="absolute inset-0 rounded-full shadow-[0_0_42px_rgba(247,197,120,0.18)]"
                         style={{
@@ -966,7 +968,7 @@ export default function AppPage() {
                       <div className="absolute inset-2 animate-spin rounded-full border border-transparent border-t-white/70 border-r-[#f7c578]/90" />
                       <div className="absolute inset-4 rounded-full bg-[#0d0f16]/95 shadow-inner shadow-black/60" />
                       <div className="relative">
-                        <div className="text-3xl font-semibold text-white">
+                        <div className="text-2xl font-semibold text-white sm:text-3xl">
                           {renderProgress}%
                         </div>
                         <div className="mt-1 text-[10px] uppercase tracking-[0.28em] text-[#f7c578]/80">
@@ -974,7 +976,7 @@ export default function AppPage() {
                         </div>
                       </div>
                     </div>
-                    <div className="mt-6 text-sm font-medium text-white/90">
+                    <div className="mt-5 text-sm font-medium text-white/90 sm:mt-6">
                       {generationStage}
                     </div>
                     <div className="mt-2 max-w-sm text-xs leading-5 text-white/45">
@@ -994,14 +996,14 @@ export default function AppPage() {
                 </div>
               )}
             </div>
-            <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-xs text-white/60">
-              <div className="flex gap-3">
+            <div className="mt-5 grid gap-3 text-xs text-white/60 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-3">
                 <span>Ratio: {ratio}</span>
                 <span>Duration: {duration}s</span>
               </div>
               {downloadUrl && (
                 <a
-                  className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0a0b10]"
+                  className="rounded-full bg-white px-4 py-2 text-center text-xs font-semibold text-[#0a0b10]"
                   href={downloadUrl}
                   download={`seedance-${ratio}.mp4`}
                 >
@@ -1011,7 +1013,7 @@ export default function AppPage() {
             </div>
           </div>
 
-          <div className="grid gap-4 rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
+          <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70 sm:rounded-3xl sm:p-6">
             <div className="flex items-center justify-between text-xs text-white/50">
               <span>Generation log</span>
               <span>{historyItems.length} loaded</span>

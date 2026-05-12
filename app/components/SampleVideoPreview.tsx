@@ -47,6 +47,10 @@ type SampleVideo = {
   videoUrl: string | null;
 };
 
+type SampleVideoResponse = Partial<Omit<SampleVideo, "videoUrl">> & {
+  videoUrl?: string | null;
+};
+
 export default function SampleVideoPreview() {
   const [sampleVideos, setSampleVideos] = useState<SampleVideo[]>(fallbackVideos);
   const [currentVideo, setCurrentVideo] = useState(0);
@@ -65,7 +69,7 @@ export default function SampleVideoPreview() {
           const realVideos = await response.json();
           if (realVideos && realVideos.length > 0) {
             // Merge real videos with fallback data
-            const mergedVideos = realVideos.map((video: any, index: number) => ({
+            const mergedVideos = realVideos.map((video: SampleVideoResponse, index: number) => ({
               ...fallbackVideos[index] || fallbackVideos[0],
               ...video,
               videoUrl: video.videoUrl || null
@@ -74,7 +78,7 @@ export default function SampleVideoPreview() {
             console.log('✅ Loaded real sample videos:', mergedVideos);
           }
         }
-      } catch (error) {
+      } catch {
         console.log('📱 Using fallback sample videos (real videos not generated yet)');
       } finally {
         setLoading(false);
@@ -123,7 +127,7 @@ export default function SampleVideoPreview() {
   return (
     <div className="mt-4 relative">
       {/* Main Video Display */}
-      <div className="relative h-64 rounded-2xl overflow-hidden bg-black">
+      <div className="relative h-56 overflow-hidden rounded-2xl bg-black sm:h-64">
         {current.videoUrl && isPlaying ? (
           // Real video playback
           <video
