@@ -53,9 +53,6 @@ const criticalFallbackCss = `
   video {
     max-width: 100%;
   }
-  body > div {
-    min-height: 100vh;
-  }
   body::before {
     content: "";
     position: fixed;
