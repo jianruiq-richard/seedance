@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { clerkClient } from "@clerk/nextjs/server";
-import { createStripeClient, getPlanByPriceId } from "@/app/lib/stripe";
+import {
+  createStripeClient,
+  getCreditPackById,
+  getPlanByPriceId,
+} from "@/app/lib/stripe";
 import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 import type Stripe from "stripe";
 
@@ -69,6 +73,12 @@ export async function POST(request: Request) {
         );
         break;
 
+      case "checkout.session.completed":
+        await handleCheckoutSessionCompleted(
+          event.data.object as Stripe.Checkout.Session
+        );
+        break;
+
       default:
         console.log(`Unhandled event type: ${event.type}`);
     }
@@ -117,8 +127,14 @@ type CreditAdjustmentEntry = {
   reason: string;
 };
 
+type StripeExpandableRef = string | { id: string } | null | undefined;
+
 function getCustomerId(customer: StripeSubscriptionLike["customer"]) {
   return typeof customer === "string" ? customer : customer.id;
+}
+
+function getExpandableId(value: StripeExpandableRef) {
+  return typeof value === "string" ? value : value?.id;
 }
 
 async function getSubscriptionFromInvoice(invoice: StripeInvoiceLike) {
@@ -282,5 +298,71 @@ async function handlePaymentFailed(invoice: StripeInvoiceLike) {
     console.log(`Payment failed for user ${clerkUserId}`);
   } catch (error) {
     console.error("Failed to handle payment failure:", error);
+  }
+}
+
+async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
+  if (
+    session.mode !== "payment" ||
+    session.payment_status !== "paid" ||
+    session.metadata?.purchase_type !== "credit_pack"
+  ) {
+    return;
+  }
+
+  const clerkUserId = session.metadata.clerk_user_id;
+  const pack = getCreditPackById(session.metadata.pack_id);
+  if (!clerkUserId || !pack) return;
+
+  try {
+    const client = await clerkClient();
+    const user = await client.users.getUser(clerkUserId);
+    const processedSessions =
+      (user.unsafeMetadata?.processedStripeCheckoutSessions as
+        | string[]
+        | undefined) ?? [];
+
+    if (processedSessions.includes(session.id)) {
+      console.log(`Skipped duplicate Stripe checkout session ${session.id}`);
+      return;
+    }
+
+    const currentCredits =
+      (user.unsafeMetadata?.credits as number | undefined) ??
+      DEFAULT_NEW_USER_CREDITS;
+    const newCredits = currentCredits + pack.credits;
+    const existingLog =
+      (user.unsafeMetadata?.creditAdjustments as
+        | CreditAdjustmentEntry[]
+        | undefined) ?? [];
+    const stripeCustomerId = getExpandableId(session.customer);
+
+    await client.users.updateUserMetadata(clerkUserId, {
+      unsafeMetadata: {
+        ...user.unsafeMetadata,
+        ...(stripeCustomerId ? { stripeCustomerId } : {}),
+        credits: newCredits,
+        processedStripeCheckoutSessions: [
+          ...processedSessions,
+          session.id,
+        ].slice(-100),
+        creditAdjustments: [
+          ...existingLog,
+          {
+            at: new Date().toISOString(),
+            admin: "stripe",
+            before: currentCredits,
+            after: newCredits,
+            reason: `Stripe ${pack.name} one-time credit pack (${session.id})`,
+          },
+        ].slice(-100),
+      },
+    });
+
+    console.log(
+      `Granted ${pack.credits} one-time credits for checkout ${session.id} to ${clerkUserId}`
+    );
+  } catch (error) {
+    console.error("Failed to grant credit pack credits:", error);
   }
 }

@@ -11,6 +11,15 @@ export type SubscriptionPlan = {
   features: string[];
 };
 
+export type CreditPack = {
+  id: "small" | "medium" | "large";
+  name: string;
+  credits: number;
+  priceId: string;
+  price: number;
+  description: string;
+};
+
 export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
   {
     id: "starter",
@@ -19,10 +28,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     monthlyPrice: 5,
     priceId: process.env.STRIPE_PRICE_STARTER || "",
     features: [
-      "5,000 credits per month",
+      "5,000 credits added each month",
       "Text to video generation",
       "Image to video generation",
-      "Basic video quality"
+      "Unused credits carry over"
     ]
   },
   {
@@ -32,10 +41,10 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     monthlyPrice: 10,
     priceId: process.env.STRIPE_PRICE_GROWTH || "",
     features: [
-      "11,000 credits per month",
-      "All Starter features",
-      "Higher video quality",
-      "Priority processing"
+      "11,000 credits added each month",
+      "Better value than Starter",
+      "Text and image to video generation",
+      "Unused credits carry over"
     ]
   },
   {
@@ -45,13 +54,39 @@ export const SUBSCRIPTION_PLANS: SubscriptionPlan[] = [
     monthlyPrice: 30,
     priceId: process.env.STRIPE_PRICE_STUDIO || "",
     features: [
-      "35,000 credits per month",
-      "All Growth features",
-      "Premium video quality",
-      "API access",
-      "Team collaboration"
+      "35,000 credits added each month",
+      "Best monthly credit value",
+      "Text and image to video generation",
+      "Unused credits carry over"
     ]
   }
+];
+
+export const CREDIT_PACKS: CreditPack[] = [
+  {
+    id: "small",
+    name: "Small Pack",
+    credits: 4000,
+    price: 5,
+    priceId: process.env.STRIPE_PRICE_CREDITS_SMALL || "",
+    description: "One-time credits for occasional generations",
+  },
+  {
+    id: "medium",
+    name: "Medium Pack",
+    credits: 9000,
+    price: 10,
+    priceId: process.env.STRIPE_PRICE_CREDITS_MEDIUM || "",
+    description: "A flexible top-up when monthly credits run low",
+  },
+  {
+    id: "large",
+    name: "Large Pack",
+    credits: 30000,
+    price: 30,
+    priceId: process.env.STRIPE_PRICE_CREDITS_LARGE || "",
+    description: "Best one-time pack for heavier bursts of work",
+  },
 ];
 
 export function getStripeEnv(): StripeEnv {
@@ -95,6 +130,10 @@ export function getPlanById(id: string | undefined): SubscriptionPlan | null {
 
 export function getPlanByPriceId(priceId: string | undefined): SubscriptionPlan | null {
   return SUBSCRIPTION_PLANS.find((plan) => plan.priceId === priceId) ?? null;
+}
+
+export function getCreditPackById(id: string | undefined): CreditPack | null {
+  return CREDIT_PACKS.find((pack) => pack.id === id) ?? null;
 }
 
 export function formatPrice(price: number): string {

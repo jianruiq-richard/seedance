@@ -36,6 +36,24 @@ NEXT_PUBLIC_CLARITY_PROJECT_ID=your_clarity_project_id
 
 Use Clarity's dashboard to inspect heatmaps and session recordings after the site receives real user traffic.
 
+## Stripe Billing
+
+Subscription plans use recurring Stripe Price IDs:
+
+```bash
+STRIPE_PRICE_STARTER=price_...
+STRIPE_PRICE_GROWTH=price_...
+STRIPE_PRICE_STUDIO=price_...
+```
+
+One-time credit packs use one-time Stripe Price IDs:
+
+```bash
+STRIPE_PRICE_CREDITS_SMALL=price_...
+STRIPE_PRICE_CREDITS_MEDIUM=price_...
+STRIPE_PRICE_CREDITS_LARGE=price_...
+```
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

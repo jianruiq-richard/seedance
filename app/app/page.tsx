@@ -914,7 +914,17 @@ export default function AppPage() {
               <p className="text-xs text-rose-200">{pricingError}</p>
             )}
             {errorMessage && (
-              <p className="text-xs text-rose-200">{errorMessage}</p>
+              <p className="text-xs text-rose-200">
+                {errorMessage}
+                {errorMessage.toLowerCase().includes("not enough credits") && (
+                  <>
+                    {" "}
+                    <Link className="text-[#f7c578] underline" href="/billing">
+                      Buy more credits
+                    </Link>
+                  </>
+                )}
+              </p>
             )}
           </div>
         </section>

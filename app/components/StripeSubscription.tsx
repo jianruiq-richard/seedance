@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
 import { useUser } from "@clerk/nextjs";
-import { SUBSCRIPTION_PLANS } from "@/app/lib/stripe";
+import { CREDIT_PACKS, SUBSCRIPTION_PLANS } from "@/app/lib/stripe";
 
 type StripeConfig = {
   publishableKey: string;
@@ -19,6 +19,7 @@ export default function StripeSubscription({ onSubscriptionUpdated, disabled }: 
   const { user } = useUser();
   const [config, setConfig] = useState<StripeConfig | null>(null);
   const [selectedPlan, setSelectedPlan] = useState(SUBSCRIPTION_PLANS[0]);
+  const [selectedPack, setSelectedPack] = useState(CREDIT_PACKS[1]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -134,6 +135,43 @@ export default function StripeSubscription({ onSubscriptionUpdated, disabled }: 
     }
   };
 
+  const handleBuyCreditPack = async () => {
+    if (!user?.emailAddresses?.[0]?.emailAddress) {
+      setError("Email address is required");
+      return;
+    }
+
+    setProcessing(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/stripe/create-credit-pack-checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          packId: selectedPack.id,
+          customerEmail: user.emailAddresses[0].emailAddress,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to create credit pack checkout");
+      }
+
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+        return;
+      }
+
+      onSubscriptionUpdated?.();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Credit pack purchase failed");
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
@@ -147,7 +185,7 @@ export default function StripeSubscription({ onSubscriptionUpdated, disabled }: 
   return (
     <div className="rounded-3xl border border-white/10 bg-white/5 p-6 text-sm text-white/70">
       <div className="flex items-center justify-between text-xs text-white/50">
-        <span>Subscription Plans</span>
+        <span>Monthly Plans</span>
         <span>{config?.env === "live" ? "Live" : "Test Mode"}</span>
       </div>
 
@@ -207,7 +245,7 @@ export default function StripeSubscription({ onSubscriptionUpdated, disabled }: 
                   ${plan.monthlyPrice}/month
                 </p>
                 <p className="text-xs opacity-70">
-                  {plan.credits.toLocaleString()} credits/month
+                  {plan.credits.toLocaleString()} credits added each month
                 </p>
                 <div className="mt-2 space-y-1">
                   {plan.features.map((feature, index) => (
@@ -248,6 +286,67 @@ export default function StripeSubscription({ onSubscriptionUpdated, disabled }: 
           )}
         </div>
       )}
+
+      <div className="mt-6 border-t border-white/10 pt-6">
+        <div className="flex items-center justify-between text-xs text-white/50">
+          <span>One-time Credit Packs</span>
+          <span>No subscription required</span>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {CREDIT_PACKS.map((pack) => (
+            <button
+              key={pack.id}
+              type="button"
+              className={`rounded-2xl border px-4 py-4 text-left transition ${
+                selectedPack.id === pack.id
+                  ? "border-[#f7c578] bg-[#f7c578]/10 text-white"
+                  : "border-white/20 text-white/70 hover:border-white/50"
+              }`}
+              onClick={() => setSelectedPack(pack)}
+              disabled={disabled || processing}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em]">
+                    {pack.name}
+                  </p>
+                  <p className="mt-1 text-lg font-bold">
+                    ${pack.price}
+                  </p>
+                  <p className="text-xs opacity-70">
+                    {pack.credits.toLocaleString()} credits, added once
+                  </p>
+                  <p className="mt-2 text-xs opacity-60">{pack.description}</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-4">
+          {disabled ? (
+            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-white/50">
+              Sign in to buy credits.
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={handleBuyCreditPack}
+              disabled={processing}
+              className="w-full rounded-2xl border border-[#f7c578]/40 bg-[#f7c578]/10 px-4 py-3 text-sm font-semibold text-[#f7c578] transition hover:bg-[#f7c578]/20 disabled:opacity-60"
+            >
+              {processing ? (
+                <span className="inline-flex items-center justify-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#f7c578] border-t-transparent" />
+                  Processing...
+                </span>
+              ) : (
+                `Buy ${selectedPack.credits.toLocaleString()} credits - $${selectedPack.price}`
+              )}
+            </button>
+          )}
+        </div>
+      </div>
 
       {error && <p className="mt-2 text-xs text-rose-200">{error}</p>}
     </div>

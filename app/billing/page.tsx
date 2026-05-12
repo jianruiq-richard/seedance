@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
 import StripeSubscription from "@/app/components/StripeSubscription";
@@ -12,6 +13,24 @@ export default function BillingPage() {
     DEFAULT_NEW_USER_CREDITS;
   const currentPlan = user?.unsafeMetadata?.currentPlan as string | undefined;
   const subscriptionStatus = user?.unsafeMetadata?.subscriptionStatus as string | undefined;
+  const [topUpSuccess, setTopUpSuccess] = useState(false);
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("topup") === "success") {
+      const showTimeout = window.setTimeout(() => setTopUpSuccess(true), 0);
+      const refreshTimeout = window.setTimeout(() => {
+        setTopUpSuccess(false);
+        window.history.replaceState({}, "", "/billing");
+        window.location.reload();
+      }, 3000);
+
+      return () => {
+        window.clearTimeout(showTimeout);
+        window.clearTimeout(refreshTimeout);
+      };
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0a0b10] text-white">
@@ -37,8 +56,19 @@ export default function BillingPage() {
         <div className="rounded-3xl border border-white/10 bg-white/5 p-8">
           <h1 className="text-3xl font-semibold">Billing & Subscription</h1>
           <p className="mt-2 text-sm text-white/60">
-            Choose a subscription plan to unlock unlimited video generation.
+            Choose a monthly credit plan or buy one-time credits when you need more.
           </p>
+
+          {topUpSuccess && (
+            <div className="mt-6 rounded-2xl border border-green-500/20 bg-green-500/10 p-4">
+              <p className="text-sm font-semibold text-green-400">
+                Credit pack payment received.
+              </p>
+              <p className="mt-1 text-xs text-green-300/80">
+                Credits are being added to your balance. This page will refresh shortly.
+              </p>
+            </div>
+          )}
 
           {/* Current Plan Info */}
           {currentPlan && (
@@ -57,18 +87,18 @@ export default function BillingPage() {
 
             <div className="rounded-3xl border border-white/10 bg-black/20 p-6 text-sm text-white/70">
               <h2 className="text-base font-semibold text-white">
-                Subscription Benefits
+                How billing works
               </h2>
               <p className="mt-2 text-sm text-white/60">
-                All subscription plans include monthly credit renewal and premium features.
+                Credits are used for every video generation. Monthly plans renew automatically, while credit packs are one-time top-ups.
               </p>
               <div className="mt-4 space-y-3 text-xs text-white/60">
-                <p>• <strong>Monthly Credits:</strong> Credits reset every billing cycle</p>
-                <p>• <strong>No Expiration:</strong> Unused credits carry over</p>
-                <p>• <strong>Priority Support:</strong> Faster response times</p>
-                <p>• <strong>Higher Quality:</strong> Premium video generation models</p>
-                <p>• <strong>Cancel Anytime:</strong> No long-term contracts</p>
-                <p>• <strong>Secure Payments:</strong> Powered by Stripe</p>
+                <p>• <strong>Monthly plans:</strong> Credits are added each billing cycle</p>
+                <p>• <strong>Credit packs:</strong> One-time purchases that add credits immediately</p>
+                <p>• <strong>No subscription required:</strong> Any signed-in user can buy credit packs</p>
+                <p>• <strong>Carry over:</strong> Unused credits stay in your balance</p>
+                <p>• <strong>Cancel anytime:</strong> Monthly plans can be canceled before the next renewal</p>
+                <p>• <strong>Secure payments:</strong> Powered by Stripe</p>
               </div>
 
               <div className="mt-6 rounded-xl border border-white/10 bg-white/5 p-3">
