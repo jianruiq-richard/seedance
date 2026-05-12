@@ -1,5 +1,5 @@
 import Link from "next/link";
-import SampleVideoPreview from "./components/SampleVideoPreview";
+import DeferredSampleVideoPreview from "./components/DeferredSampleVideoPreview";
 
 const highlights = [
   {
@@ -85,7 +85,7 @@ export default function Home() {
               <span>Preview</span>
               <span className="rounded-full border border-white/20 px-2 py-1">Live</span>
             </div>
-            <SampleVideoPreview />
+            <DeferredSampleVideoPreview />
           </div>
         </section>
 

@@ -67,13 +67,15 @@ export default function SampleVideoPreview() {
         const response = await fetch('/samples/videos.json');
         if (response.ok) {
           const realVideos = await response.json();
-          if (realVideos && realVideos.length > 0) {
+          if (Array.isArray(realVideos) && realVideos.length > 0) {
             // Merge real videos with fallback data
-            const mergedVideos = realVideos.map((video: SampleVideoResponse, index: number) => ({
-              ...fallbackVideos[index] || fallbackVideos[0],
-              ...video,
-              videoUrl: video.videoUrl || null
-            }));
+            const mergedVideos = realVideos.map(
+              (video: SampleVideoResponse, index: number) => ({
+                ...(fallbackVideos[index] || fallbackVideos[0]),
+                ...video,
+                videoUrl: video.videoUrl || null,
+              })
+            );
             setSampleVideos(mergedVideos);
             console.log('✅ Loaded real sample videos:', mergedVideos);
           }
@@ -183,6 +185,7 @@ export default function SampleVideoPreview() {
                 {current.videoUrl ? (
                   <button
                     onClick={handlePlay}
+                    aria-label={`Play sample video: ${current.title}`}
                     className="inline-flex items-center gap-2 rounded-full bg-white/15 backdrop-blur px-5 py-2 text-sm font-medium text-white transition-all hover:bg-white/25 hover:scale-105"
                   >
                     <span className="text-base">▶</span>
@@ -200,12 +203,14 @@ export default function SampleVideoPreview() {
             {/* Navigation arrows */}
             <button
               onClick={prevVideo}
+              aria-label="Show previous sample video"
               className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/40 backdrop-blur p-2 text-white/70 transition hover:bg-black/60 hover:text-white"
             >
               ←
             </button>
             <button
               onClick={nextVideo}
+              aria-label="Show next sample video"
               className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/40 backdrop-blur p-2 text-white/70 transition hover:bg-black/60 hover:text-white"
             >
               →
@@ -217,6 +222,8 @@ export default function SampleVideoPreview() {
                 <button
                   key={index}
                   onClick={() => selectVideo(index)}
+                  aria-label={`Show sample video ${index + 1}`}
+                  aria-current={index === currentVideo ? "true" : undefined}
                   className={`h-1.5 w-6 rounded-full transition-all ${
                     index === currentVideo ? 'bg-white' : 'bg-white/30 hover:bg-white/50'
                   }`}
@@ -232,6 +239,7 @@ export default function SampleVideoPreview() {
             <button
               onClick={() => setIsMuted(!isMuted)}
               className="rounded-full bg-black/50 backdrop-blur p-2 text-white/80 transition hover:bg-black/70"
+              aria-label={isMuted ? "Unmute sample video" : "Mute sample video"}
               title={isMuted ? "开启声音" : "静音"}
             >
               {isMuted ? "🔇" : "🔊"}
@@ -239,6 +247,7 @@ export default function SampleVideoPreview() {
             <button
               onClick={handlePause}
               className="rounded-full bg-black/50 backdrop-blur p-2 text-white/80 transition hover:bg-black/70"
+              aria-label="Pause sample video"
               title="暂停"
             >
               ⏸
@@ -251,17 +260,17 @@ export default function SampleVideoPreview() {
       <div className="mt-5 grid gap-3 text-sm text-white/70">
         <div className="flex items-center justify-between">
           <span>Prompt</span>
-          <span className="text-white/40 transition-all duration-300 text-right max-w-[200px] truncate">
+          <span className="text-white/60 transition-all duration-300 text-right max-w-[200px] truncate">
             {current.title}
           </span>
         </div>
         <div className="flex items-center justify-between">
           <span>Style</span>
-          <span className="text-white/40 transition-all duration-300">{current.style}</span>
+          <span className="text-white/60 transition-all duration-300">{current.style}</span>
         </div>
         <div className="flex items-center justify-between">
           <span>Duration</span>
-          <span className="text-white/40 transition-all duration-300">{current.duration}</span>
+          <span className="text-white/60 transition-all duration-300">{current.duration}</span>
         </div>
         {current.videoUrl && (
           <div className="flex items-center justify-between">
