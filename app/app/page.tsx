@@ -123,6 +123,7 @@ export default function AppPage() {
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [seedKey, setSeedKey] = useState<number>(Date.now());
+  const [renderProgress, setRenderProgress] = useState<number>(0);
 
   const [credits, setCredits] = useState<number>(DEFAULT_NEW_USER_CREDITS);
   const [pricingCredits, setPricingCredits] = useState<number>(100);
@@ -163,6 +164,13 @@ export default function AppPage() {
     const normalized = ratio as RatioKey;
     return ratioSizeMap[normalized] ?? ratioSizeMap["16:9"];
   }, [ratio]);
+
+  const generationStage = useMemo(() => {
+    if (renderProgress < 28) return "Preparing scene";
+    if (renderProgress < 58) return "Composing motion";
+    if (renderProgress < 82) return "Rendering frames";
+    return "Finalizing video";
+  }, [renderProgress]);
 
   const availableResolutions = useMemo(
     () =>
@@ -209,6 +217,28 @@ export default function AppPage() {
     referenceUrls.video,
     referenceDurations.video,
   ]);
+
+  useEffect(() => {
+    if (status !== "generating") {
+      if (status === "idle" || status === "error") {
+        setRenderProgress(0);
+      }
+      return;
+    }
+
+    setRenderProgress(6);
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      setRenderProgress((previous) => {
+        const elapsedSeconds = (Date.now() - startedAt) / 1000;
+        const curvedProgress = 94 - 88 * Math.exp(-elapsedSeconds / 38);
+        const nextProgress = Math.max(previous + 0.5, curvedProgress);
+        return Math.min(94, Math.round(nextProgress));
+      });
+    }, 900);
+
+    return () => window.clearInterval(interval);
+  }, [status]);
 
   useEffect(() => {
     return () => {
@@ -405,6 +435,7 @@ export default function AppPage() {
       return;
     }
     setStatus("generating");
+    setRenderProgress(6);
     setVideoUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
@@ -504,6 +535,7 @@ export default function AppPage() {
       }
 
       if (outputUrl) {
+        setRenderProgress(100);
         setVideoUrl(outputUrl);
         setDownloadUrl(outputUrl);
         setStatus("ready");
@@ -896,7 +928,7 @@ export default function AppPage() {
               </span>
             </div>
             <div
-              className="mt-4 flex min-h-[320px] items-center justify-center rounded-2xl border border-dashed border-white/15 bg-black/20"
+              className="relative mt-4 flex min-h-[320px] items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/20"
               style={{ aspectRatio: `${aspectSize.width}/${aspectSize.height}` }}
             >
               {videoUrl ? (
@@ -907,6 +939,45 @@ export default function AppPage() {
                   controls
                   loop
                 />
+              ) : status === "generating" ? (
+                <div className="relative flex h-full min-h-[320px] w-full items-center justify-center overflow-hidden">
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(247,197,120,0.16),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%)]" />
+                  <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,white_1px,transparent_1px)] bg-[length:22px_22px]" />
+                  <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f7c578]/10 blur-3xl" />
+
+                  <div className="relative z-10 flex flex-col items-center px-6 text-center">
+                    <div className="relative grid h-36 w-36 place-items-center">
+                      <div
+                        className="absolute inset-0 rounded-full shadow-[0_0_42px_rgba(247,197,120,0.18)]"
+                        style={{
+                          background: `conic-gradient(#f7c578 ${renderProgress * 3.6}deg, rgba(255,255,255,0.12) 0deg)`,
+                        }}
+                      />
+                      <div className="absolute inset-2 animate-spin rounded-full border border-transparent border-t-white/70 border-r-[#f7c578]/90" />
+                      <div className="absolute inset-4 rounded-full bg-[#0d0f16]/95 shadow-inner shadow-black/60" />
+                      <div className="relative">
+                        <div className="text-3xl font-semibold text-white">
+                          {renderProgress}%
+                        </div>
+                        <div className="mt-1 text-[10px] uppercase tracking-[0.28em] text-[#f7c578]/80">
+                          Rendering
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-6 text-sm font-medium text-white/90">
+                      {generationStage}
+                    </div>
+                    <div className="mt-2 max-w-sm text-xs leading-5 text-white/45">
+                      Keep this page open while Seedance prepares your video.
+                    </div>
+                    <div className="mt-5 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-white/10">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[#f7c578] via-white to-[#f7c578] transition-all duration-700"
+                        style={{ width: `${renderProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
               ) : (
                 <div className="text-center text-sm text-white/40">
                   Your result will appear here.
