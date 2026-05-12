@@ -28,6 +28,14 @@ NEXT_PUBLIC_GA_MEASUREMENT_ID=G-XXXXXXXXXX
 
 Use `trackEvent` from `app/lib/analytics.ts` in client components to record custom behavior, for example video generation, sign-up, or checkout actions.
 
+Microsoft Clarity is loaded when `NEXT_PUBLIC_CLARITY_PROJECT_ID` is configured:
+
+```bash
+NEXT_PUBLIC_CLARITY_PROJECT_ID=your_clarity_project_id
+```
+
+Use Clarity's dashboard to inspect heatmaps and session recordings after the site receives real user traffic.
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

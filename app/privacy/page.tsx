@@ -15,6 +15,7 @@ export default function PrivacyPage() {
       <ul>
         <li>Information you provide (e.g., email) when you sign up or contact us</li>
         <li>Usage data (e.g., pages visited, device/browser information)</li>
+        <li>Interaction data from analytics and session replay tools to improve the product experience</li>
       </ul>
 
       <h2>How we use information</h2>
