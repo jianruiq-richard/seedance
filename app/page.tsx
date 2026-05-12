@@ -36,8 +36,9 @@ export default function Home() {
             Sign in
           </Link>
           <Link
-            className="rounded-full bg-white px-3 py-2 text-xs text-[#0b0c10] transition hover:bg-white/90 sm:px-4 sm:text-sm"
+            className="rounded-full border border-white/20 bg-white/5 px-3 py-2 text-xs text-white/85 transition hover:border-white/40 hover:bg-white/10 sm:px-4 sm:text-sm"
             href="/app"
+            prefetch
           >
             Open Studio
           </Link>
@@ -62,8 +63,9 @@ export default function Home() {
             </p>
             <div className="grid gap-3 sm:flex sm:flex-wrap">
               <Link
-                className="rounded-full bg-[#f7c578] px-6 py-3 text-center text-sm font-semibold text-[#0b0c10] transition hover:bg-[#f7c578]/90"
+                className="rounded-full border border-[#f7c578]/35 bg-[#f7c578]/10 px-6 py-3 text-center text-sm font-semibold text-[#f7c578] transition hover:bg-[#f7c578]/15"
                 href="/app"
+                prefetch
               >
                 Generate now
               </Link>
@@ -111,8 +113,9 @@ export default function Home() {
               </p>
             </div>
             <Link
-              className="rounded-full bg-white px-6 py-3 text-center text-sm font-semibold text-[#0b0c10] transition hover:bg-white/90"
+              className="rounded-full border border-white/20 bg-white/5 px-6 py-3 text-center text-sm font-semibold text-white/85 transition hover:border-white/40 hover:bg-white/10"
               href="/app"
+              prefetch
             >
               Open workspace
             </Link>

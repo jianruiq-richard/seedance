@@ -574,7 +574,7 @@ export default function AppPage() {
                   <span className="font-semibold text-white">{credits}</span>
                 </div>
                 <Link
-                  className="rounded-full bg-[#f7c578] px-3 py-2 text-xs font-semibold text-[#0a0b10] transition hover:bg-[#f7c578]/90 sm:px-4"
+                  className="rounded-full border border-white/15 bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 transition hover:border-white/35 hover:bg-white/10 hover:text-white sm:px-4"
                   href="/billing"
                 >
                   Billing
