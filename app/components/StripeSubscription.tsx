@@ -13,9 +13,14 @@ type StripeConfig = {
 type Props = {
   onSubscriptionUpdated?: () => void;
   disabled?: boolean;
+  showCreditPacks?: boolean;
 };
 
-export default function StripeSubscription({ onSubscriptionUpdated, disabled }: Props) {
+export default function StripeSubscription({
+  onSubscriptionUpdated,
+  disabled,
+  showCreditPacks = true,
+}: Props) {
   const { user } = useUser();
   const [config, setConfig] = useState<StripeConfig | null>(null);
   const [selectedPlan, setSelectedPlan] = useState(SUBSCRIPTION_PLANS[0]);
@@ -287,66 +292,68 @@ export default function StripeSubscription({ onSubscriptionUpdated, disabled }: 
         </div>
       )}
 
-      <div className="mt-6 border-t border-white/10 pt-6">
-        <div className="flex items-center justify-between text-xs text-white/50">
-          <span>One-time Credit Packs</span>
-          <span>No subscription required</span>
-        </div>
-        <div className="mt-4 grid gap-3">
-          {CREDIT_PACKS.map((pack) => (
-            <button
-              key={pack.id}
-              type="button"
-              className={`rounded-2xl border px-4 py-4 text-left transition ${
-                selectedPack.id === pack.id
-                  ? "border-[#f7c578] bg-[#f7c578]/10 text-white"
-                  : "border-white/20 text-white/70 hover:border-white/50"
-              }`}
-              onClick={() => setSelectedPack(pack)}
-              disabled={disabled || processing}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em]">
-                    {pack.name}
-                  </p>
-                  <p className="mt-1 text-lg font-bold">
-                    ${pack.price}
-                  </p>
-                  <p className="text-xs opacity-70">
-                    {pack.credits.toLocaleString()} credits, added once
-                  </p>
-                  <p className="mt-2 text-xs opacity-60">{pack.description}</p>
+      {showCreditPacks && (
+        <div className="mt-6 border-t border-white/10 pt-6">
+          <div className="flex items-center justify-between text-xs text-white/50">
+            <span>One-time Credit Packs</span>
+            <span>No subscription required</span>
+          </div>
+          <div className="mt-4 grid gap-3">
+            {CREDIT_PACKS.map((pack) => (
+              <button
+                key={pack.id}
+                type="button"
+                className={`rounded-2xl border px-4 py-4 text-left transition ${
+                  selectedPack.id === pack.id
+                    ? "border-[#f7c578] bg-[#f7c578]/10 text-white"
+                    : "border-white/20 text-white/70 hover:border-white/50"
+                }`}
+                onClick={() => setSelectedPack(pack)}
+                disabled={disabled || processing}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.2em]">
+                      {pack.name}
+                    </p>
+                    <p className="mt-1 text-lg font-bold">${pack.price}</p>
+                    <p className="text-xs opacity-70">
+                      {pack.credits.toLocaleString()} credits, added once
+                    </p>
+                    <p className="mt-2 text-xs opacity-60">
+                      {pack.description}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
-        </div>
+              </button>
+            ))}
+          </div>
 
-        <div className="mt-4">
-          {disabled ? (
-            <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-white/50">
-              Sign in to buy credits.
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={handleBuyCreditPack}
-              disabled={processing}
-              className="w-full rounded-2xl border border-[#f7c578]/40 bg-[#f7c578]/10 px-4 py-3 text-sm font-semibold text-[#f7c578] transition hover:bg-[#f7c578]/20 disabled:opacity-60"
-            >
-              {processing ? (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#f7c578] border-t-transparent" />
-                  Processing...
-                </span>
-              ) : (
-                `Buy ${selectedPack.credits.toLocaleString()} credits - $${selectedPack.price}`
-              )}
-            </button>
-          )}
+          <div className="mt-4">
+            {disabled ? (
+              <div className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-xs text-white/50">
+                Sign in to buy credits.
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={handleBuyCreditPack}
+                disabled={processing}
+                className="w-full rounded-2xl border border-[#f7c578]/40 bg-[#f7c578]/10 px-4 py-3 text-sm font-semibold text-[#f7c578] transition hover:bg-[#f7c578]/20 disabled:opacity-60"
+              >
+                {processing ? (
+                  <span className="inline-flex items-center justify-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#f7c578] border-t-transparent" />
+                    Processing...
+                  </span>
+                ) : (
+                  `Buy ${selectedPack.credits.toLocaleString()} credits - $${selectedPack.price}`
+                )}
+              </button>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {error && <p className="mt-2 text-xs text-rose-200">{error}</p>}
     </div>

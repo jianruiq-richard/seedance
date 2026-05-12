@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
+import CreditPackCheckout from "@/app/components/CreditPackCheckout";
 import StripeSubscription from "@/app/components/StripeSubscription";
 import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
@@ -82,9 +83,16 @@ export default function BillingPage() {
             </div>
           )}
 
-          <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
-            <StripeSubscription disabled={!user} onSubscriptionUpdated={() => window.location.reload()} />
+          <div className="mt-8 grid gap-6 xl:grid-cols-2">
+            <StripeSubscription
+              disabled={!user}
+              showCreditPacks={false}
+              onSubscriptionUpdated={() => window.location.reload()}
+            />
+            <CreditPackCheckout disabled={!user} />
+          </div>
 
+          <div className="mt-8 grid gap-8 lg:grid-cols-[1.1fr_0.9fr]">
             <div className="rounded-3xl border border-white/10 bg-black/20 p-6 text-sm text-white/70">
               <h2 className="text-base font-semibold text-white">
                 How billing works
