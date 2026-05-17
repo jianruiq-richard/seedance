@@ -25,6 +25,7 @@ const ratios = [
 const durations = [4, 5, 6, 8, 10, 12, 15];
 const GENERATION_POLL_INTERVAL_MS = 3000;
 const GENERATION_MAX_POLLS = 200;
+const GENERATION_MAX_POLL_ERRORS = 8;
 
 type Mode = "text" | "image";
 type MediaKind = "image" | "video" | "audio";
@@ -46,6 +47,37 @@ function getMediaKind(file: File): MediaKind | null {
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/")) return "audio";
   return null;
+}
+
+function formatApiError(data: unknown, fallback: string) {
+  if (!data || typeof data !== "object") {
+    return fallback;
+  }
+
+  const record = data as Record<string, unknown>;
+  const error =
+    typeof record.error === "string"
+      ? record.error
+      : record.error &&
+          typeof record.error === "object" &&
+          "message" in record.error
+        ? String((record.error as { message?: unknown }).message)
+        : fallback;
+  const statusPart =
+    typeof record.upstreamStatus === "number"
+      ? ` (upstream ${record.upstreamStatus})`
+      : "";
+  const detail = record.detail
+    ? typeof record.detail === "string"
+      ? record.detail
+      : JSON.stringify(record.detail)
+    : "";
+
+  return `${error}${statusPart}${detail ? `\n${detail}` : ""}`;
+}
+
+function parseApiJson(response: Response) {
+  return response.json().catch(() => ({})) as Promise<Record<string, unknown>>;
 }
 
 type GenerationHistoryItem = {
@@ -496,6 +528,9 @@ export default function AppPage() {
       const jobId = data?.jobId ?? null;
 
       if (!outputUrl && taskId) {
+        let pollErrorCount = 0;
+        let lastPollError: Error | null = null;
+
         for (let i = 0; i < GENERATION_MAX_POLLS; i += 1) {
           await new Promise((resolve) =>
             setTimeout(resolve, GENERATION_POLL_INTERVAL_MS)
@@ -504,10 +539,44 @@ export default function AppPage() {
           if (jobId) {
             pollParams.set("jobId", jobId);
           }
-          const pollResponse = await fetch(`/api/seedance?${pollParams}`);
-          const pollData = await pollResponse.json();
+
+          let pollResponse: Response;
+          try {
+            pollResponse = await fetch(`/api/seedance?${pollParams}`);
+          } catch (error) {
+            pollErrorCount += 1;
+            lastPollError =
+              error instanceof Error
+                ? error
+                : new Error("Generation polling failed.");
+            if (pollErrorCount <= GENERATION_MAX_POLL_ERRORS) {
+              continue;
+            }
+            throw lastPollError;
+          }
+          const pollData = await parseApiJson(pollResponse);
+
+          if (!pollResponse.ok) {
+            const pollError = new Error(
+              formatApiError(pollData, "Generation polling failed.")
+            );
+            if (
+              pollResponse.status >= 500 &&
+              pollErrorCount < GENERATION_MAX_POLL_ERRORS
+            ) {
+              pollErrorCount += 1;
+              lastPollError = pollError;
+              continue;
+            }
+            throw pollError;
+          }
+
+          pollErrorCount = 0;
+          lastPollError = null;
+
           taskStatus = pollData?.status ?? taskStatus;
-          outputUrl = pollData?.videoUrl ?? null;
+          outputUrl =
+            typeof pollData?.videoUrl === "string" ? pollData.videoUrl : null;
 
           if (taskStatus === "succeeded" && outputUrl) {
             break;
@@ -517,20 +586,14 @@ export default function AppPage() {
             taskStatus === "expired" ||
             taskStatus === "cancelled"
           ) {
-            const pollError =
-              pollData?.error?.message ||
-              (typeof pollData?.error === "string" ? pollData.error : "");
-            const pollDetail = pollData?.detail
-              ? typeof pollData.detail === "string"
-                ? pollData.detail
-                : JSON.stringify(pollData.detail)
-              : "";
             throw new Error(
-              `${pollError || `Generation ${taskStatus}.`}${
-                pollDetail ? `\n${pollDetail}` : ""
-              }`
+              formatApiError(pollData, `Generation ${taskStatus}.`)
             );
           }
+        }
+
+        if (!outputUrl && lastPollError) {
+          throw lastPollError;
         }
       }
 

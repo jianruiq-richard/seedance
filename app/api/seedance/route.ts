@@ -402,6 +402,22 @@ export async function GET(request: Request) {
     if (!job) {
       return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
+    if (job.status === "succeeded" && job.videoUrl) {
+      return NextResponse.json({
+        status: "succeeded",
+        videoUrl: job.videoUrl,
+        error: null,
+        raw: null,
+      });
+    }
+    if (job.status === "failed") {
+      return NextResponse.json({
+        status: "failed",
+        videoUrl: job.videoUrl,
+        error: job.errorMessage ?? "Generation failed.",
+        raw: null,
+      });
+    }
     taskId = job.upstreamTaskId;
   }
 
