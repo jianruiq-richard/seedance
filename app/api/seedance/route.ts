@@ -9,9 +9,12 @@ import {
 import {
   createGenerationJob,
   getGenerationJobForUser,
-  updateGenerationJobResult,
 } from "../../lib/generation-jobs";
-import { archiveVideoToTos } from "../../lib/tos";
+import {
+  fetchSeedanceTask,
+  getSeedanceVideoUrl,
+  syncGenerationJobFromSeedance,
+} from "../../lib/seedance-tasks";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -425,99 +428,45 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing taskId" }, { status: 400 });
   }
 
-  const baseUrl = getBaseUrl();
-  const response = await fetch(
-    `${baseUrl}/contents/generations/tasks/${taskId}`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
+  if (jobId) {
+    const job = await getGenerationJobForUser(jobId, userId);
+    if (!job) {
+      return NextResponse.json({ error: "Job not found" }, { status: 404 });
     }
-  );
+    try {
+      const result = await syncGenerationJobFromSeedance(job);
+      return NextResponse.json({
+        status: result.status,
+        videoUrl: result.videoUrl,
+        error: result.error,
+        raw: result.raw,
+      });
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: "Seedance polling failed",
+          detail: error instanceof Error ? error.message : "Unknown error",
+        },
+        { status: 500 }
+      );
+    }
+  }
 
-  if (!response.ok) {
-    const detail = await response.text();
+  try {
+    const data = await fetchSeedanceTask(taskId);
+    return NextResponse.json({
+      status: data.status ?? "unknown",
+      videoUrl: getSeedanceVideoUrl(data),
+      error: data.error ?? null,
+      raw: data,
+    });
+  } catch (error) {
     return NextResponse.json(
       {
         error: "Seedance polling failed",
-        upstreamStatus: response.status,
-        detail: detail || `HTTP ${response.status} ${response.statusText}`,
+        detail: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
     );
   }
-
-  const data = (await response.json()) as {
-    status?: string;
-    error?: unknown;
-    output?: {
-      video_url?: string;
-      video_urls?: string[];
-      videos?: { url?: string }[];
-    };
-    content?: {
-      video_url?: string;
-      video_urls?: string[];
-      last_frame_url?: string;
-    };
-    result?: { video_url?: string; video_urls?: string[] };
-  };
-
-  const videoUrl =
-    data.output?.video_url ??
-    data.output?.video_urls?.[0] ??
-    data.output?.videos?.[0]?.url ??
-    data.content?.video_url ??
-    data.content?.video_urls?.[0] ??
-    data.result?.video_url ??
-    data.result?.video_urls?.[0] ??
-    null;
-
-  let persistedVideoUrl = videoUrl;
-
-  if (jobId) {
-    if (data.status === "succeeded" && videoUrl) {
-      try {
-        persistedVideoUrl = await archiveVideoToTos({
-          sourceUrl: videoUrl,
-          userId,
-          jobId,
-        });
-      } catch (error) {
-        console.error("Failed to archive generated video:", error);
-      }
-      await updateGenerationJobResult({
-        id: jobId,
-        clerkUserId: userId,
-        status: "succeeded",
-        videoUrl: persistedVideoUrl,
-      });
-    }
-    if (
-      data.status === "failed" ||
-      data.status === "expired" ||
-      data.status === "cancelled"
-    ) {
-      const errorMessage =
-        typeof data.error === "string"
-          ? data.error
-          : data.error
-            ? JSON.stringify(data.error)
-            : `Generation ${data.status}`;
-      await updateGenerationJobResult({
-        id: jobId,
-        clerkUserId: userId,
-        status: "failed",
-        errorMessage,
-      });
-    }
-  }
-
-  return NextResponse.json({
-    status: data.status ?? "unknown",
-    videoUrl: persistedVideoUrl,
-    error: data.error ?? null,
-    raw: data,
-  });
 }

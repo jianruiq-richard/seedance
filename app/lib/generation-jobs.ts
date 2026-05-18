@@ -152,6 +152,28 @@ export async function updateGenerationJobResult({
   return result.rows[0] ? mapGenerationJob(result.rows[0]) : null;
 }
 
+export async function listStaleQueuedGenerationJobs({
+  olderThanMinutes,
+  limit,
+}: {
+  olderThanMinutes: number;
+  limit: number;
+}) {
+  const boundedLimit = Math.min(Math.max(limit, 1), 50);
+  const boundedMinutes = Math.min(Math.max(olderThanMinutes, 1), 1440);
+  const result = await getPool().query(
+    `select * from generation_jobs
+     where status = 'queued'
+       and upstream_task_id is not null
+       and created_at < now() - ($1::int * interval '1 minute')
+     order by created_at asc, id asc
+     limit $2`,
+    [boundedMinutes, boundedLimit]
+  );
+
+  return result.rows.map(mapGenerationJob);
+}
+
 export async function listGenerationJobsForUser({
   clerkUserId,
   limit,

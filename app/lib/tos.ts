@@ -12,6 +12,10 @@ const endpoint = process.env.TOS_ENDPOINT?.trim();
 const bucket = process.env.TOS_BUCKET?.trim();
 const region = (process.env.TOS_REGION || "cn-beijing").trim();
 
+function normalizeTosEndpoint(value: string) {
+  return value.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+}
+
 function isConfigured() {
   return Boolean(accessKeyId && secretAccessKey && endpoint && bucket);
 }
@@ -24,7 +28,8 @@ function createClient() {
     accessKeyId,
     accessKeySecret: secretAccessKey,
     region,
-    endpoint,
+    endpoint: normalizeTosEndpoint(endpoint),
+    secure: true,
   });
 }
 
@@ -68,5 +73,5 @@ export async function archiveVideoToTos({
     throw error;
   }
 
-  return `https://${bucket}.${endpoint}/${key}`;
+  return `https://${bucket}.${normalizeTosEndpoint(endpoint!)}/${key}`;
 }

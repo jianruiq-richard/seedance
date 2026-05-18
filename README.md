@@ -54,6 +54,17 @@ STRIPE_PRICE_CREDITS_MEDIUM=price_...
 STRIPE_PRICE_CREDITS_LARGE=price_...
 ```
 
+Queued generation reconciliation is exposed at `/api/seedance/reconcile` and
+scheduled by `vercel.json`. In production, configure `CRON_SECRET` so Vercel
+Cron can authorize the request. Manual calls can also use
+`SEEDANCE_RECONCILE_SECRET`:
+
+```bash
+CRON_SECRET=...
+# or
+SEEDANCE_RECONCILE_SECRET=...
+```
+
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More

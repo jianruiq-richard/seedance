@@ -11,6 +11,10 @@ const endpoint = process.env.TOS_ENDPOINT?.trim();
 const bucket = process.env.TOS_BUCKET?.trim();
 const region = (process.env.TOS_REGION || "cn-beijing").trim();
 
+function normalizeTosEndpoint(value: string) {
+  return value.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+}
+
 function requireConfig() {
   if (!accessKeyId || !secretAccessKey || !endpoint || !bucket) {
     throw new Error(
@@ -27,7 +31,8 @@ function createClient() {
     accessKeyId,
     accessKeySecret: secretAccessKey,
     region,
-    endpoint,
+    endpoint: normalizeTosEndpoint(endpoint),
+    secure: true,
   });
 }
 
@@ -93,6 +98,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const publicUrl = `https://${bucket}.${endpoint}/${key}`;
+  const publicUrl = `https://${bucket}.${normalizeTosEndpoint(endpoint!)}/${key}`;
   return NextResponse.json({ url: publicUrl, contentType });
 }

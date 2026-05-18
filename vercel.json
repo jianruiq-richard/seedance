@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/seedance/reconcile",
+      "schedule": "*/10 * * * *"
+    }
+  ]
+}
