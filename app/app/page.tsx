@@ -1101,7 +1101,7 @@ export default function AppPage() {
               </div>
               {downloadUrl && (
                 <a
-                  className="rounded-full bg-white px-4 py-2 text-center text-xs font-semibold text-[#0a0b10]"
+                  className="inline-flex min-w-[132px] items-center justify-center rounded-full border border-white/20 bg-white px-4 py-2 text-center text-xs font-semibold !text-[#0a0b10] shadow-sm transition hover:bg-white/90"
                   href={downloadUrl}
                   download={`seedance-${ratio}.mp4`}
                 >
@@ -1168,7 +1168,7 @@ export default function AppPage() {
                         </div>
                         {item.downloadUrl && (
                           <a
-                            className="rounded-full bg-white px-4 py-2 text-xs font-semibold text-[#0a0b10]"
+                            className="inline-flex min-w-[112px] items-center justify-center rounded-full border border-white/20 bg-white px-4 py-2 text-xs font-semibold !text-[#0a0b10] shadow-sm transition hover:bg-white/90"
                             href={item.downloadUrl}
                             download={`seedance-${item.mode}-${itemRatio}.mp4`}
                           >
