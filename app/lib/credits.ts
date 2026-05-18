@@ -333,7 +333,10 @@ export function calculateVideoPrice(
     minTokens[resolutionLabel as ResolutionLabel][ratioGroup][outputDuration];
   const estimatedTokens =
     ((inputVideoDuration + durationSeconds) * width * height * fps) / 1024;
-  const finalBilledTokens = Math.max(estimatedTokens, minTokensLimit);
+  const finalBilledTokens =
+    inputVideoDuration > 0
+      ? Math.max(estimatedTokens, minTokensLimit)
+      : estimatedTokens;
   const priceMode = inputVideoDuration > 0 ? "with_video" : "no_video";
   const resolutionPrices =
     (
