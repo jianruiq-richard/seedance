@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { listGenerationJobsForUser } from "../../lib/generation-jobs";
+import { syncGenerationJobFromSeedance } from "../../lib/seedance-tasks";
 
 export const runtime = "nodejs";
+export const maxDuration = 300;
+const MAX_INLINE_QUEUED_SYNCS = 5;
 
 function parseLimit(value: string | null) {
   const parsed = Number(value);
@@ -23,6 +26,29 @@ export async function GET(request: Request) {
     limit,
     cursor,
   });
+  const queuedJobs = result.items
+    .filter((item) => item.status === "queued" && item.upstreamTaskId)
+    .slice(0, MAX_INLINE_QUEUED_SYNCS);
 
-  return NextResponse.json(result);
+  if (queuedJobs.length === 0) {
+    return NextResponse.json(result);
+  }
+
+  const syncedJobs = await Promise.all(
+    queuedJobs.map(async (job) => {
+      try {
+        const synced = await syncGenerationJobFromSeedance(job);
+        return synced.job;
+      } catch (error) {
+        console.error("Failed to sync queued generation history item:", error);
+        return job;
+      }
+    })
+  );
+  const syncedById = new Map(syncedJobs.map((job) => [job.id, job]));
+
+  return NextResponse.json({
+    ...result,
+    items: result.items.map((item) => syncedById.get(item.id) ?? item),
+  });
 }
