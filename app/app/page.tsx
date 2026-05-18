@@ -26,6 +26,8 @@ const durations = [4, 5, 6, 8, 10, 12, 15];
 const GENERATION_POLL_INTERVAL_MS = 3000;
 const GENERATION_MAX_POLLS = 200;
 const GENERATION_MAX_POLL_ERRORS = 8;
+const HISTORY_QUEUED_POLL_INTERVAL_MS = 15000;
+const HISTORY_QUEUED_MAX_POLL_MS = 20 * 60 * 1000;
 
 type Mode = "text" | "image";
 type MediaKind = "image" | "video" | "audio";
@@ -188,6 +190,8 @@ export default function AppPage() {
   }, []);
 
   const cleanupUrls = useRef<string[]>([]);
+  const historyLoadingRef = useRef(false);
+  const historyQueuedPollStartedAtRef = useRef<number | null>(null);
   const uploadTokens = useRef<Record<MediaKind, string | null>>(
     emptyMediaRecord<string | null>(null)
   );
@@ -286,7 +290,11 @@ export default function AppPage() {
         setHistoryNextCursor(null);
         return;
       }
+      if (historyLoadingRef.current) {
+        return;
+      }
 
+      historyLoadingRef.current = true;
       setHistoryLoading(true);
       setHistoryError(null);
       try {
@@ -310,6 +318,7 @@ export default function AppPage() {
             : "Failed to load generation history."
         );
       } finally {
+        historyLoadingRef.current = false;
         setHistoryLoading(false);
       }
     },
@@ -320,6 +329,32 @@ export default function AppPage() {
     void loadGenerationHistory({ reset: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSignedIn, user?.id]);
+
+  useEffect(() => {
+    const hasQueuedHistory = historyItems.some(
+      (item) => item.status === "queued"
+    );
+
+    if (!isSignedIn || !hasQueuedHistory) {
+      historyQueuedPollStartedAtRef.current = null;
+      return;
+    }
+
+    historyQueuedPollStartedAtRef.current ??= Date.now();
+    const handle = window.setInterval(() => {
+      const startedAt = historyQueuedPollStartedAtRef.current;
+      if (
+        startedAt &&
+        Date.now() - startedAt > HISTORY_QUEUED_MAX_POLL_MS
+      ) {
+        window.clearInterval(handle);
+        return;
+      }
+      void loadGenerationHistory({ reset: true });
+    }, HISTORY_QUEUED_POLL_INTERVAL_MS);
+
+    return () => window.clearInterval(handle);
+  }, [historyItems, isSignedIn, loadGenerationHistory]);
 
   const uploadReferenceFile = async (
     kind: MediaKind,
