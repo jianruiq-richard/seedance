@@ -24,10 +24,10 @@ const ratios = [
 
 const durations = [4, 5, 6, 8, 10, 12, 15];
 const GENERATION_POLL_INTERVAL_MS = 3000;
-const GENERATION_MAX_POLLS = 200;
+const GENERATION_MAX_POLLS = 600;
 const GENERATION_MAX_POLL_ERRORS = 8;
 const HISTORY_QUEUED_POLL_INTERVAL_MS = 15000;
-const HISTORY_QUEUED_MAX_POLL_MS = 20 * 60 * 1000;
+const HISTORY_QUEUED_MAX_POLL_MS = 30 * 60 * 1000;
 
 type Mode = "text" | "image";
 type MediaKind = "image" | "video" | "audio";
