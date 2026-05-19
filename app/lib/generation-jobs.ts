@@ -34,6 +34,8 @@ export type CreateGenerationJobInput = {
   resolution: string;
   duration: number;
   generateAudio: boolean;
+  status?: GenerationStatus;
+  errorMessage?: string | null;
 };
 
 declare global {
@@ -93,8 +95,12 @@ export async function createGenerationJob(input: CreateGenerationJobInput) {
       ratio,
       resolution,
       duration,
-      generate_audio
-    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      generate_audio,
+      status,
+      error_message,
+      completed_at
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
+      case when $11 = 'failed' then now() else null end)
     returning *`,
     [
       input.clerkUserId,
@@ -107,6 +113,8 @@ export async function createGenerationJob(input: CreateGenerationJobInput) {
       input.resolution,
       input.duration,
       input.generateAudio,
+      input.status ?? "queued",
+      input.errorMessage ?? null,
     ]
   );
 

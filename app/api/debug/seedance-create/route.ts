@@ -38,10 +38,26 @@ export async function GET() {
     message:
       "POST this endpoint to create a real Seedance task from Vercel without writing generation_jobs or charging site credits.",
     warning: "This still consumes Volcengine/Ark generation quota.",
+    example: {
+      attempts: 1,
+      prompt: "Neon city streets, slow motion, cinematic glow",
+      resolution: "720p",
+      duration: 15,
+      ratio: "16:9",
+      generate_audio: true,
+    },
   });
 }
 
-export async function POST() {
+function parseInteger(value: unknown, fallback: number, min: number, max: number) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) {
+    return fallback;
+  }
+  return Math.min(Math.max(parsed, min), max);
+}
+
+export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -55,34 +71,90 @@ export async function POST() {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const body = (await request.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
   const startedAt = Date.now();
+  const attempts = parseInteger(body.attempts, 1, 1, 3);
   const payload = {
-    model: DEFAULT_SEEDANCE_MODEL,
+    model:
+      typeof body.model === "string" && body.model.trim()
+        ? body.model.trim()
+        : DEFAULT_SEEDANCE_MODEL,
     content: [
       {
         type: "text",
-        text: "Neon city streets, slow motion, cinematic glow",
+        text:
+          typeof body.prompt === "string" && body.prompt.trim()
+            ? body.prompt.trim()
+            : "Neon city streets, slow motion, cinematic glow",
       },
     ],
-    ratio: "16:9",
-    resolution: "480p",
-    duration: 4,
-    seed: -1,
-    watermark: false,
-    generate_audio: true,
-    execution_expires_after: 172800,
-    return_last_frame: false,
-    safety_identifier: userId,
+    ratio:
+      typeof body.ratio === "string" && body.ratio.trim()
+        ? body.ratio.trim()
+        : "16:9",
+    resolution:
+      typeof body.resolution === "string" && body.resolution.trim()
+        ? body.resolution.trim()
+        : "480p",
+    duration: parseInteger(body.duration, 4, -1, 15),
+    seed: parseInteger(body.seed, -1, -1, 2147483647),
+    watermark: Boolean(body.watermark),
+    generate_audio:
+      typeof body.generate_audio === "boolean" ? body.generate_audio : true,
+    execution_expires_after: parseInteger(
+      body.execution_expires_after,
+      172800,
+      3600,
+      259200
+    ),
+    return_last_frame: Boolean(body.return_last_frame),
+    safety_identifier:
+      typeof body.safety_identifier === "string" && body.safety_identifier.trim()
+        ? body.safety_identifier.trim()
+        : userId,
   };
+  const results = [];
 
-  try {
-    const data = await createSeedanceTask(payload);
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const attemptStartedAt = Date.now();
 
-    return NextResponse.json({
-      ok: true,
+    try {
+      const data = await createSeedanceTask(payload);
+
+      results.push({
+        ok: true,
+        attempt,
+        durationMs: Date.now() - attemptStartedAt,
+        taskId: data.id ?? null,
+      });
+    } catch (error) {
+      results.push({
+        ok: false,
+        attempt,
+        durationMs: Date.now() - attemptStartedAt,
+        error: error instanceof Error ? error.message : String(error),
+        detail:
+          error instanceof SeedanceRequestError ? error.detail : undefined,
+        causeCode:
+          error instanceof SeedanceRequestError ? error.causeCode : undefined,
+        upstreamStatus:
+          error instanceof SeedanceRequestError ? error.status : undefined,
+      });
+    }
+  }
+
+  const ok = results.some((result) => result.ok);
+
+  return NextResponse.json(
+    {
+      ok,
       region: process.env.VERCEL_REGION ?? null,
       durationMs: Date.now() - startedAt,
-      taskId: data.id ?? null,
+      attempts,
+      results,
       payload: {
         model: payload.model,
         ratio: payload.ratio,
@@ -91,22 +163,9 @@ export async function POST() {
         generate_audio: payload.generate_audio,
         safety_identifier: payload.safety_identifier,
       },
-    });
-  } catch (error) {
-    return NextResponse.json(
-      {
-        ok: false,
-        region: process.env.VERCEL_REGION ?? null,
-        durationMs: Date.now() - startedAt,
-        error: error instanceof Error ? error.message : String(error),
-        detail:
-          error instanceof SeedanceRequestError ? error.detail : undefined,
-        causeCode:
-          error instanceof SeedanceRequestError ? error.causeCode : undefined,
-        upstreamStatus:
-          error instanceof SeedanceRequestError ? error.status : undefined,
-      },
-      { status: 502 }
-    );
-  }
+      warning:
+        "Each successful attempt creates a real Ark task and consumes Volcengine quota.",
+    },
+    { status: ok ? 200 : 502 }
+  );
 }

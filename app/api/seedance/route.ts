@@ -326,17 +326,54 @@ export async function POST(request: Request) {
 
     data = await createSeedanceTask(seedancePayload);
   } catch (error) {
+    const errorDetail =
+      error instanceof SeedanceRequestError
+        ? error.detail
+        : error instanceof Error
+          ? error.message
+          : "Unknown error";
+    const errorMessage =
+      error instanceof SeedanceRequestError && error.causeCode
+        ? `${errorDetail} (${error.causeCode})`
+        : errorDetail;
+
     console.error("Seedance task creation failed:", {
       requestId,
       userId,
       region: process.env.VERCEL_REGION ?? null,
       error: error instanceof Error ? error.message : String(error),
-      detail: error instanceof SeedanceRequestError ? error.detail : undefined,
+      detail: errorDetail,
       causeCode:
         error instanceof SeedanceRequestError ? error.causeCode : undefined,
       upstreamStatus:
         error instanceof SeedanceRequestError ? error.status : undefined,
     });
+
+    try {
+      await createGenerationJob({
+        clerkUserId: userId,
+        upstreamTaskId: null,
+        mode: generationMode,
+        prompt: promptForLog,
+        imageUrl,
+        creditsCharged: 0,
+        ratio,
+        resolution,
+        duration,
+        generateAudio,
+        status: "failed",
+        errorMessage,
+      });
+    } catch (recordError) {
+      console.error("Failed to record Seedance creation failure:", {
+        requestId,
+        userId,
+        error:
+          recordError instanceof Error
+            ? recordError.message
+            : String(recordError),
+      });
+    }
 
     return NextResponse.json(
       {
@@ -345,12 +382,7 @@ export async function POST(request: Request) {
         region: process.env.VERCEL_REGION ?? null,
         upstreamStatus:
           error instanceof SeedanceRequestError ? error.status : undefined,
-        detail:
-          error instanceof SeedanceRequestError
-            ? error.detail
-            : error instanceof Error
-              ? error.message
-              : "Unknown error",
+        detail: errorDetail,
         causeCode:
           error instanceof SeedanceRequestError ? error.causeCode : undefined,
       },

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { updateUserCreditsWithLog } from "../users/actions";
 import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
+import { listGenerationJobsForUser } from "@/app/lib/generation-jobs";
 
 export const dynamic = "force-dynamic";
 
@@ -109,6 +110,10 @@ export default async function AdminUserDetailPage({ searchParams }: PageProps) {
           };
         }[]
       | undefined) ?? [];
+  const generationJobs = await listGenerationJobsForUser({
+    clerkUserId: userId,
+    limit: 20,
+  });
 
   return (
     <div className="min-h-screen bg-[#0a0b10] text-white">
@@ -174,6 +179,60 @@ export default async function AdminUserDetailPage({ searchParams }: PageProps) {
                 Confirm update
               </button>
             </form>
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6">
+          <h2 className="text-lg font-semibold">Generation jobs</h2>
+          <p className="mt-1 text-xs text-white/50">
+            Recent queued, succeeded, and failed generation attempts from the
+            job database.
+          </p>
+          <div className="mt-4 space-y-3 text-xs text-white/60">
+            {generationJobs.items.length === 0 ? (
+              <p>No generation jobs yet.</p>
+            ) : (
+              generationJobs.items.map((job) => (
+                <div
+                  key={job.id}
+                  className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <span
+                        className={`mr-2 rounded-full px-2 py-1 text-[10px] uppercase tracking-[0.15em] ${
+                          job.status === "succeeded"
+                            ? "bg-emerald-400/10 text-emerald-200"
+                            : job.status === "failed"
+                              ? "bg-red-400/10 text-red-200"
+                              : "bg-yellow-400/10 text-yellow-200"
+                        }`}
+                      >
+                        {job.status}
+                      </span>
+                      <span className="text-white/50">
+                        {new Date(job.createdAt).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="text-white/40">
+                      {job.creditsCharged} credits
+                    </div>
+                  </div>
+                  <div className="mt-2 text-white/40">
+                    {job.resolution ?? "—"} · {job.ratio ?? "—"} ·{" "}
+                    {job.duration ?? "—"}s · audio{" "}
+                    {job.generateAudio ? "on" : "off"}
+                    {job.upstreamTaskId ? ` · ${job.upstreamTaskId}` : ""}
+                  </div>
+                  {job.errorMessage && (
+                    <p className="mt-2 break-words text-red-200/80">
+                      {job.errorMessage}
+                    </p>
+                  )}
+                  <p className="mt-2 break-words text-white/50">{job.prompt}</p>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
