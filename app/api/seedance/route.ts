@@ -287,26 +287,49 @@ export async function POST(request: Request) {
 
   const generationMode = imageUrl ? "image" : "text";
   const promptForLog = prompt || "(media reference)";
+  const requestId = crypto.randomUUID();
+  const seedancePayload = {
+    model,
+    content,
+    ratio,
+    resolution,
+    duration,
+    seed: body.seed,
+    watermark: body.watermark,
+    generate_audio: body.generate_audio,
+    execution_expires_after: body.execution_expires_after,
+    return_last_frame: body.return_last_frame,
+    safety_identifier: userId,
+  };
 
   let data: { id?: string };
 
   try {
-    data = await createSeedanceTask({
+    console.info("Seedance task creation starting:", {
+      requestId,
+      userId,
+      region: process.env.VERCEL_REGION ?? null,
       model,
-      content,
       ratio,
       resolution,
       duration,
-      seed: body.seed,
-      watermark: body.watermark,
-      generate_audio: body.generate_audio,
-      execution_expires_after: body.execution_expires_after,
-      return_last_frame: body.return_last_frame,
-      safety_identifier: userId,
+      seed: seedancePayload.seed,
+      watermark: seedancePayload.watermark,
+      generate_audio: seedancePayload.generate_audio,
+      execution_expires_after: seedancePayload.execution_expires_after,
+      return_last_frame: seedancePayload.return_last_frame,
+      contentTypes: content.map((item) => item.type),
+      hasImageUrl: Boolean(imageUrl),
+      hasVideoUrl: Boolean(videoUrl),
+      hasAudioUrl: Boolean(audioUrl),
     });
+
+    data = await createSeedanceTask(seedancePayload);
   } catch (error) {
     console.error("Seedance task creation failed:", {
+      requestId,
       userId,
+      region: process.env.VERCEL_REGION ?? null,
       error: error instanceof Error ? error.message : String(error),
       detail: error instanceof SeedanceRequestError ? error.detail : undefined,
       causeCode:
@@ -318,6 +341,8 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error: "Seedance request failed",
+        requestId,
+        region: process.env.VERCEL_REGION ?? null,
         upstreamStatus:
           error instanceof SeedanceRequestError ? error.status : undefined,
         detail:
