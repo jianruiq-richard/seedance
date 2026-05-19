@@ -11,8 +11,10 @@ import {
   getGenerationJobForUser,
 } from "../../lib/generation-jobs";
 import {
+  createSeedanceTask,
   fetchSeedanceTask,
   getSeedanceVideoUrl,
+  SeedanceRequestError,
   syncGenerationJobFromSeedance,
 } from "../../lib/seedance-tasks";
 
@@ -67,14 +69,6 @@ function requireConfig() {
       "Seedance API is not configured. Please set VOLCENGINE_ARK_API_KEY and VOLCENGINE_ARK_ENDPOINT."
     );
   }
-}
-
-function getBaseUrl() {
-  const raw = endpoint?.replace(/\/+$/, "") ?? "";
-  if (raw.endsWith("/api/v3")) {
-    return raw;
-  }
-  return `${raw}/api/v3`;
 }
 
 function normalizeModel(input?: string | null) {
@@ -294,14 +288,10 @@ export async function POST(request: Request) {
   const generationMode = imageUrl ? "image" : "text";
   const promptForLog = prompt || "(media reference)";
 
-  const baseUrl = getBaseUrl();
-  const response = await fetch(`${baseUrl}/contents/generations/tasks`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  let data: { id?: string };
+
+  try {
+    data = await createSeedanceTask({
       model,
       content,
       ratio,
@@ -313,22 +303,36 @@ export async function POST(request: Request) {
       execution_expires_after: body.execution_expires_after,
       return_last_frame: body.return_last_frame,
       safety_identifier: userId,
-    }),
-  });
+    });
+  } catch (error) {
+    console.error("Seedance task creation failed:", {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+      detail: error instanceof SeedanceRequestError ? error.detail : undefined,
+      causeCode:
+        error instanceof SeedanceRequestError ? error.causeCode : undefined,
+      upstreamStatus:
+        error instanceof SeedanceRequestError ? error.status : undefined,
+    });
 
-  if (!response.ok) {
-    const detail = await response.text();
     return NextResponse.json(
       {
         error: "Seedance request failed",
-        upstreamStatus: response.status,
-        detail: detail || `HTTP ${response.status} ${response.statusText}`,
+        upstreamStatus:
+          error instanceof SeedanceRequestError ? error.status : undefined,
+        detail:
+          error instanceof SeedanceRequestError
+            ? error.detail
+            : error instanceof Error
+              ? error.message
+              : "Unknown error",
+        causeCode:
+          error instanceof SeedanceRequestError ? error.causeCode : undefined,
       },
       { status: 500 }
     );
   }
 
-  const data = (await response.json()) as { id?: string };
   const taskId = data.id ?? null;
   const generationJob = await createGenerationJob({
     clerkUserId: userId,

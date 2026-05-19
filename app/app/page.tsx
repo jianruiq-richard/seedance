@@ -535,7 +535,7 @@ export default function AppPage() {
           return_last_frame: returnLastFrame,
         }),
       });
-      const data = await response.json();
+      const data = await parseApiJson(response);
 
       if (!response.ok) {
         const detail = data?.detail
@@ -557,10 +557,12 @@ export default function AppPage() {
         setCredits(data.creditsRemaining);
       }
 
-      let taskStatus = data?.status ?? "queued";
-      let outputUrl = data?.videoUrl ?? null;
-      const taskId = data?.taskId ?? null;
-      const jobId = data?.jobId ?? null;
+      let taskStatus =
+        typeof data?.status === "string" ? data.status : "queued";
+      let outputUrl =
+        typeof data?.videoUrl === "string" ? data.videoUrl : null;
+      const taskId = typeof data?.taskId === "string" ? data.taskId : null;
+      const jobId = typeof data?.jobId === "string" ? data.jobId : null;
 
       if (!outputUrl && taskId) {
         let pollErrorCount = 0;
@@ -609,7 +611,8 @@ export default function AppPage() {
           pollErrorCount = 0;
           lastPollError = null;
 
-          taskStatus = pollData?.status ?? taskStatus;
+          taskStatus =
+            typeof pollData?.status === "string" ? pollData.status : taskStatus;
           outputUrl =
             typeof pollData?.videoUrl === "string" ? pollData.videoUrl : null;
 
