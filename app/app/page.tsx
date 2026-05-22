@@ -358,6 +358,20 @@ export default function AppPage() {
     return () => window.clearInterval(handle);
   }, [historyItems, isSignedIn, loadGenerationHistory]);
 
+  useEffect(() => {
+    if (errorMessage !== "Generation failed.") {
+      return;
+    }
+
+    const latestDetailedFailure = historyItems.find(
+      (item) => item.status === "failed" && item.errorMessage
+    );
+
+    if (latestDetailedFailure?.errorMessage) {
+      setErrorMessage(latestDetailedFailure.errorMessage);
+    }
+  }, [errorMessage, historyItems]);
+
   const uploadReferenceFile = async (
     kind: MediaKind,
     file: File,
@@ -556,8 +570,6 @@ export default function AppPage() {
 
       if (!outputUrl && taskId) {
         let pollErrorCount = 0;
-        let lastPollError: Error | null = null;
-
         for (let i = 0; i < GENERATION_MAX_POLLS; i += 1) {
           await new Promise((resolve) =>
             setTimeout(resolve, GENERATION_POLL_INTERVAL_MS)
@@ -570,16 +582,9 @@ export default function AppPage() {
           let pollResponse: Response;
           try {
             pollResponse = await fetch(`/api/seedance?${pollParams}`);
-          } catch (error) {
+          } catch {
             pollErrorCount += 1;
-            lastPollError =
-              error instanceof Error
-                ? error
-                : new Error("Generation polling failed.");
-            if (pollErrorCount <= GENERATION_MAX_POLL_ERRORS) {
-              continue;
-            }
-            throw lastPollError;
+            continue;
           }
           const pollData = await parseApiJson(pollResponse);
 
@@ -592,14 +597,16 @@ export default function AppPage() {
               pollErrorCount < GENERATION_MAX_POLL_ERRORS
             ) {
               pollErrorCount += 1;
-              lastPollError = pollError;
+              continue;
+            }
+            if (pollResponse.status >= 500) {
+              pollErrorCount += 1;
               continue;
             }
             throw pollError;
           }
 
           pollErrorCount = 0;
-          lastPollError = null;
 
           taskStatus =
             typeof pollData?.status === "string" ? pollData.status : taskStatus;
@@ -620,9 +627,6 @@ export default function AppPage() {
           }
         }
 
-        if (!outputUrl && lastPollError) {
-          throw lastPollError;
-        }
       }
 
       if (outputUrl) {
@@ -631,7 +635,9 @@ export default function AppPage() {
         setDownloadUrl(outputUrl);
         setStatus("ready");
       } else {
-        throw new Error("Generation timed out. Please try again.");
+        throw new Error(
+          "Generation is still processing. Check the generation log for updates."
+        );
       }
 
       setSeedKey(Date.now());
@@ -641,6 +647,7 @@ export default function AppPage() {
       setErrorMessage(
         error instanceof Error ? error.message : "Generation failed, try again."
       );
+      void loadGenerationHistory({ reset: true });
     }
   };
 
