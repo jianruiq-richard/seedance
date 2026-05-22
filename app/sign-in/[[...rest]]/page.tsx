@@ -1,14 +1,17 @@
-import { SignIn } from "@clerk/nextjs";
+import GoogleAuthCard from "@/app/components/GoogleAuthCard";
 
 export const metadata = { title: "Sign In | Seedance" };
 
 export default function Page() {
   return (
-    <main style={{ maxWidth: 420, margin: "60px auto", padding: 16 }}>
-      <h1 style={{ marginBottom: 16, fontSize: 28, fontWeight: 600 }}>
+    <main className="mx-auto max-w-md px-4 py-16">
+      <h1 className="mb-3 text-3xl font-semibold text-white">
         Sign in
       </h1>
-      <SignIn />
+      <p className="mb-6 text-sm text-white/60">
+        Continue with your Google account.
+      </p>
+      <GoogleAuthCard mode="sign-in" />
     </main>
   );
 }

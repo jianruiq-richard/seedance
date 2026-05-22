@@ -1,4 +1,4 @@
-import SignUpForm from "./SignUpForm";
+import GoogleAuthCard from "@/app/components/GoogleAuthCard";
 
 export const metadata = { title: "Sign Up | Seedance" };
 
@@ -9,9 +9,9 @@ export default function Page() {
         Create your account
       </h1>
       <p className="mb-6 text-sm text-white/60">
-        Use a Gmail address to keep account access reliable.
+        Continue with a Google account to keep access reliable.
       </p>
-      <SignUpForm />
+      <GoogleAuthCard mode="sign-up" />
     </main>
   );
 }
