@@ -3,6 +3,7 @@ import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { buildCreditMetadataUpdate } from "@/app/lib/credit-metadata";
 import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
+import { requireAllowedEmailUser } from "@/app/lib/server-email-access";
 
 export const runtime = "nodejs";
 
@@ -11,6 +12,10 @@ export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const access = await requireAllowedEmailUser(userId);
+  if (access.response) {
+    return access.response;
   }
 
   try {

@@ -1,14 +1,17 @@
-import { SignUp } from "@clerk/nextjs";
+import SignUpForm from "./SignUpForm";
 
 export const metadata = { title: "Sign Up | Seedance" };
 
 export default function Page() {
   return (
-    <main style={{ maxWidth: 420, margin: "60px auto", padding: 16 }}>
-      <h1 style={{ marginBottom: 16, fontSize: 28, fontWeight: 600 }}>
+    <main className="mx-auto max-w-md px-4 py-16">
+      <h1 className="mb-3 text-3xl font-semibold text-white">
         Create your account
       </h1>
-      <SignUp />
+      <p className="mb-6 text-sm text-white/60">
+        Use a Gmail address to keep account access reliable.
+      </p>
+      <SignUpForm />
     </main>
   );
 }

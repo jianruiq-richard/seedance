@@ -8,6 +8,10 @@ import {
 } from "../../lib/credits";
 import { buildCreditMetadataUpdate } from "../../lib/credit-metadata";
 import {
+  getPrimaryEmailAddress,
+  isAllowedSignupEmail,
+} from "../../lib/email-access";
+import {
   createGenerationJob,
   getGenerationJobForUser,
 } from "../../lib/generation-jobs";
@@ -220,6 +224,18 @@ export async function POST(request: Request) {
 
   const client = await clerkClient();
   const clerkUser = await client.users.getUser(userId);
+  const primaryEmail = getPrimaryEmailAddress(clerkUser);
+
+  if (!isAllowedSignupEmail(primaryEmail)) {
+    return NextResponse.json(
+      {
+        error: "Gmail account required",
+        detail: "Please sign in with a Gmail address to generate videos.",
+      },
+      { status: 403 }
+    );
+  }
+
   const currentCredits =
     (clerkUser.unsafeMetadata?.credits as number | undefined) ??
     DEFAULT_NEW_USER_CREDITS;

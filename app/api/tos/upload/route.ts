@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import crypto from "crypto";
 import { TosClient, TosClientError, TosServerError, ACLType } from "@volcengine/tos-sdk";
+import { requireAllowedEmailUser } from "@/app/lib/server-email-access";
 
 export const runtime = "nodejs";
 
@@ -40,6 +41,10 @@ export async function POST(request: Request) {
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const access = await requireAllowedEmailUser(userId);
+  if (access.response) {
+    return access.response;
   }
 
   try {
