@@ -58,7 +58,9 @@ function formatApiError(data: unknown, fallback: string) {
 
   const record = data as Record<string, unknown>;
   const error =
-    typeof record.error === "string"
+    typeof record.errorMessage === "string"
+      ? record.errorMessage
+      : typeof record.error === "string"
       ? record.error
       : record.error &&
           typeof record.error === "object" &&

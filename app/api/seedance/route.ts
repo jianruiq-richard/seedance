@@ -15,6 +15,7 @@ import {
   fetchSeedanceTask,
   getSeedanceVideoUrl,
   SeedanceRequestError,
+  getSeedanceErrorMessage,
   syncGenerationJobFromSeedance,
 } from "../../lib/seedance-tasks";
 
@@ -500,6 +501,7 @@ export async function GET(request: Request) {
         status: result.status,
         videoUrl: result.videoUrl,
         error: result.error,
+        errorMessage: result.errorMessage,
         raw: result.raw,
       });
     } catch (error) {
@@ -519,6 +521,12 @@ export async function GET(request: Request) {
       status: data.status ?? "unknown",
       videoUrl: getSeedanceVideoUrl(data),
       error: data.error ?? null,
+      errorMessage:
+        data.status === "failed" ||
+        data.status === "expired" ||
+        data.status === "cancelled"
+          ? getSeedanceErrorMessage(data)
+          : null,
       raw: data,
     });
   } catch (error) {

@@ -195,9 +195,17 @@ export async function createSeedanceTask(body: Record<string, unknown>) {
   });
 }
 
-function getSeedanceErrorMessage(data: SeedanceTaskResponse) {
+export function getSeedanceErrorMessage(data: SeedanceTaskResponse) {
   if (typeof data.error === "string") {
     return data.error;
+  }
+  if (
+    data.error &&
+    typeof data.error === "object" &&
+    "message" in data.error &&
+    typeof data.error.message === "string"
+  ) {
+    return data.error.message;
   }
   if (data.error) {
     return JSON.stringify(data.error);
@@ -340,6 +348,12 @@ export async function syncGenerationJobFromSeedance(job: GenerationJob) {
     status: data.status ?? "unknown",
     videoUrl: persistedVideoUrl,
     error: data.error ?? null,
+    errorMessage:
+      data.status === "failed" ||
+      data.status === "expired" ||
+      data.status === "cancelled"
+        ? getSeedanceErrorMessage(data)
+        : null,
     raw: data,
     job: updatedJob ?? job,
   };
