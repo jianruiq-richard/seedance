@@ -335,8 +335,8 @@ export async function POST(request: Request) {
           : "Unknown error";
     const errorMessage =
       error instanceof SeedanceRequestError && error.causeCode
-        ? `${errorDetail} (${error.causeCode})`
-        : errorDetail;
+        ? `${errorDetail} (${error.causeCode}, request ${requestId})`
+        : `${errorDetail} (request ${requestId})`;
 
     console.error("Seedance task creation failed:", {
       requestId,
@@ -480,6 +480,7 @@ export async function GET(request: Request) {
         status: "failed",
         videoUrl: job.videoUrl,
         error: job.errorMessage ?? "Generation failed.",
+        errorMessage: job.errorMessage ?? "Generation failed.",
         raw: null,
       });
     }
