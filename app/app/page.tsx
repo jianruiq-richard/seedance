@@ -540,19 +540,7 @@ export default function AppPage() {
       const data = await parseApiJson(response);
 
       if (!response.ok) {
-        const detail = data?.detail
-          ? typeof data.detail === "string"
-            ? data.detail
-            : JSON.stringify(data.detail)
-          : "";
-        const statusPart = data?.upstreamStatus
-          ? ` (upstream ${data.upstreamStatus})`
-          : "";
-        throw new Error(
-          `${data?.error || "Generation failed."}${statusPart}${
-            detail ? `\n${detail}` : ""
-          }`
-        );
+        throw new Error(formatApiError(data, "Generation failed."));
       }
 
       if (typeof data?.creditsRemaining === "number") {

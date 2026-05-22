@@ -341,7 +341,16 @@ export async function syncGenerationJobFromSeedance(job: GenerationJob) {
       status: "failed",
       errorMessage,
     });
-    await refundFailedGenerationJob(job, errorMessage);
+    try {
+      await refundFailedGenerationJob(job, errorMessage);
+    } catch (error) {
+      console.error("Failed to refund failed generation:", {
+        jobId: job.id,
+        taskId: job.upstreamTaskId,
+        userId: job.clerkUserId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   return {
