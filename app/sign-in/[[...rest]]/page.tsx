@@ -1,4 +1,4 @@
-import GoogleAuthCard from "@/app/components/GoogleAuthCard";
+import { SignIn } from "@clerk/nextjs";
 
 export const metadata = { title: "Sign In | Seedance" };
 
@@ -11,7 +11,7 @@ export default function Page() {
       <p className="mb-6 text-sm text-white/60">
         Continue with your Google account.
       </p>
-      <GoogleAuthCard mode="sign-in" />
+      <SignIn />
     </main>
   );
 }
