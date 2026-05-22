@@ -1,4 +1,8 @@
-import { updateGenerationJobResult, type GenerationJob } from "./generation-jobs";
+import { clerkClient } from "@clerk/nextjs/server";
+import {
+  updateGenerationJobResult,
+  type GenerationJob,
+} from "./generation-jobs";
 import { archiveVideoToTos } from "./tos";
 
 const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
@@ -201,6 +205,87 @@ function getSeedanceErrorMessage(data: SeedanceTaskResponse) {
   return `Generation ${data.status ?? "failed"}`;
 }
 
+async function refundFailedGenerationJob(job: GenerationJob, reason: string) {
+  if (job.creditsCharged <= 0) {
+    return;
+  }
+
+  const client = await clerkClient();
+  const user = await client.users.getUser(job.clerkUserId);
+  const metadata = user.unsafeMetadata ?? {};
+  const refundedJobIds =
+    (metadata.refundedGenerationJobIds as string[] | undefined) ?? [];
+
+  if (refundedJobIds.includes(job.id)) {
+    return;
+  }
+
+  const currentCredits = (metadata.credits as number | undefined) ?? 0;
+  const creditUsage =
+    (metadata.creditUsage as
+      | {
+          at: string;
+          amount: number;
+          note?: string;
+          taskId?: string | null;
+          jobId?: string | null;
+          prompt?: string;
+          params?: {
+            ratio?: string | null;
+            resolution?: string | null;
+            duration?: number | null;
+            generateAudio?: boolean | null;
+          };
+        }[]
+      | undefined) ?? [];
+  const creditAdjustments =
+    (metadata.creditAdjustments as
+      | {
+          at: string;
+          admin: string;
+          before: number;
+          after: number;
+          reason: string;
+        }[]
+      | undefined) ?? [];
+  const nextCredits = currentCredits + job.creditsCharged;
+
+  await client.users.updateUserMetadata(job.clerkUserId, {
+    unsafeMetadata: {
+      ...metadata,
+      credits: nextCredits,
+      refundedGenerationJobIds: [...refundedJobIds, job.id].slice(-200),
+      creditUsage: [
+        ...creditUsage,
+        {
+          at: new Date().toISOString(),
+          amount: job.creditsCharged,
+          note: "Refund failed generation",
+          taskId: job.upstreamTaskId,
+          jobId: job.id,
+          prompt: job.prompt.slice(0, 240),
+          params: {
+            ratio: job.ratio,
+            resolution: job.resolution,
+            duration: job.duration,
+            generateAudio: job.generateAudio,
+          },
+        },
+      ].slice(-100),
+      creditAdjustments: [
+        ...creditAdjustments,
+        {
+          at: new Date().toISOString(),
+          admin: "system",
+          before: currentCredits,
+          after: nextCredits,
+          reason: `Refund failed generation ${job.upstreamTaskId ?? job.id}: ${reason.slice(0, 180)}`,
+        },
+      ].slice(-50),
+    },
+  });
+}
+
 export async function syncGenerationJobFromSeedance(job: GenerationJob) {
   if (!job.upstreamTaskId) {
     return {
@@ -241,12 +326,14 @@ export async function syncGenerationJobFromSeedance(job: GenerationJob) {
     data.status === "expired" ||
     data.status === "cancelled"
   ) {
+    const errorMessage = getSeedanceErrorMessage(data);
     updatedJob = await updateGenerationJobResult({
       id: job.id,
       clerkUserId: job.clerkUserId,
       status: "failed",
-      errorMessage: getSeedanceErrorMessage(data),
+      errorMessage,
     });
+    await refundFailedGenerationJob(job, errorMessage);
   }
 
   return {
