@@ -25,7 +25,6 @@ const ratios = [
 const durations = [4, 5, 6, 8, 10, 12, 15];
 const GENERATION_POLL_INTERVAL_MS = 3000;
 const GENERATION_MAX_POLLS = 600;
-const GENERATION_MAX_POLL_ERRORS = 8;
 const HISTORY_QUEUED_POLL_INTERVAL_MS = 15000;
 const HISTORY_QUEUED_MAX_POLL_MS = 30 * 60 * 1000;
 
@@ -194,6 +193,8 @@ export default function AppPage() {
   const cleanupUrls = useRef<string[]>([]);
   const historyLoadingRef = useRef(false);
   const historyQueuedPollStartedAtRef = useRef<number | null>(null);
+  const activeGenerationRunRef = useRef<string | null>(null);
+  const activeGenerationJobIdRef = useRef<string | null>(null);
   const uploadTokens = useRef<Record<MediaKind, string | null>>(
     emptyMediaRecord<string | null>(null)
   );
@@ -364,7 +365,11 @@ export default function AppPage() {
     }
 
     const latestDetailedFailure = historyItems.find(
-      (item) => item.status === "failed" && item.errorMessage
+      (item) =>
+        item.status === "failed" &&
+        item.errorMessage &&
+        (!activeGenerationJobIdRef.current ||
+          item.id === activeGenerationJobIdRef.current)
     );
 
     if (latestDetailedFailure?.errorMessage) {
@@ -517,6 +522,12 @@ export default function AppPage() {
       setErrorMessage("Wait for the input video duration to load.");
       return;
     }
+    const generationRunId = crypto.randomUUID();
+    const isCurrentGeneration = () =>
+      activeGenerationRunRef.current === generationRunId;
+
+    activeGenerationRunRef.current = generationRunId;
+    activeGenerationJobIdRef.current = null;
     setStatus("generating");
     setRenderProgress(6);
     setVideoUrl((prev) => {
@@ -552,6 +563,9 @@ export default function AppPage() {
         }),
       });
       const data = await parseApiJson(response);
+      if (!isCurrentGeneration()) {
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(formatApiError(data, "Generation failed."));
@@ -567,13 +581,17 @@ export default function AppPage() {
         typeof data?.videoUrl === "string" ? data.videoUrl : null;
       const taskId = typeof data?.taskId === "string" ? data.taskId : null;
       const jobId = typeof data?.jobId === "string" ? data.jobId : null;
+      activeGenerationJobIdRef.current = jobId;
+      void loadGenerationHistory({ reset: true });
 
       if (!outputUrl && taskId) {
-        let pollErrorCount = 0;
         for (let i = 0; i < GENERATION_MAX_POLLS; i += 1) {
           await new Promise((resolve) =>
             setTimeout(resolve, GENERATION_POLL_INTERVAL_MS)
           );
+          if (!isCurrentGeneration()) {
+            return;
+          }
           const pollParams = new URLSearchParams({ taskId });
           if (jobId) {
             pollParams.set("jobId", jobId);
@@ -583,30 +601,16 @@ export default function AppPage() {
           try {
             pollResponse = await fetch(`/api/seedance?${pollParams}`);
           } catch {
-            pollErrorCount += 1;
             continue;
           }
           const pollData = await parseApiJson(pollResponse);
-
-          if (!pollResponse.ok) {
-            const pollError = new Error(
-              formatApiError(pollData, "Generation polling failed.")
-            );
-            if (
-              pollResponse.status >= 500 &&
-              pollErrorCount < GENERATION_MAX_POLL_ERRORS
-            ) {
-              pollErrorCount += 1;
-              continue;
-            }
-            if (pollResponse.status >= 500) {
-              pollErrorCount += 1;
-              continue;
-            }
-            throw pollError;
+          if (!isCurrentGeneration()) {
+            return;
           }
 
-          pollErrorCount = 0;
+          if (!pollResponse.ok) {
+            continue;
+          }
 
           taskStatus =
             typeof pollData?.status === "string" ? pollData.status : taskStatus;
@@ -630,10 +634,14 @@ export default function AppPage() {
       }
 
       if (outputUrl) {
+        if (!isCurrentGeneration()) {
+          return;
+        }
         setRenderProgress(100);
         setVideoUrl(outputUrl);
         setDownloadUrl(outputUrl);
         setStatus("ready");
+        activeGenerationRunRef.current = null;
       } else {
         throw new Error(
           "Generation is still processing. Check the generation log for updates."
@@ -643,10 +651,14 @@ export default function AppPage() {
       setSeedKey(Date.now());
       void loadGenerationHistory({ reset: true });
     } catch (error) {
+      if (!isCurrentGeneration()) {
+        return;
+      }
       setStatus("error");
       setErrorMessage(
         error instanceof Error ? error.message : "Generation failed, try again."
       );
+      activeGenerationRunRef.current = null;
       void loadGenerationHistory({ reset: true });
     }
   };
