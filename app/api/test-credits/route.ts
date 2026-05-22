@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/nextjs/server";
+import { buildCreditMetadataUpdate } from "@/app/lib/credit-metadata";
 import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
 export const runtime = "nodejs";
@@ -25,15 +26,24 @@ export async function POST(request: Request) {
       DEFAULT_NEW_USER_CREDITS;
     const newCredits = currentCredits + (credits || 5000);
 
-    await client.users.updateUser(userId, {
-      unsafeMetadata: {
-        ...user.unsafeMetadata,
+    await client.users.updateUserMetadata(userId, {
+      unsafeMetadata: buildCreditMetadataUpdate({
+        metadata: {
+          ...user.unsafeMetadata,
+          currentPlan: planId || "starter",
+          subscriptionStatus: "active",
+          stripeCustomerId: "test_customer",
+          stripeSubscriptionId: "test_subscription",
+        },
         credits: newCredits,
-        currentPlan: planId || "starter",
-        subscriptionStatus: "active",
-        stripeCustomerId: "test_customer",
-        stripeSubscriptionId: "test_subscription",
-      },
+        adjustmentEntry: {
+          at: new Date().toISOString(),
+          admin: "test",
+          before: currentCredits,
+          after: newCredits,
+          reason: `Test credits update (${planId || "starter"})`,
+        },
+      }),
     });
 
     return NextResponse.json({

@@ -7,6 +7,7 @@ import {
   getPlanByPriceId,
 } from "@/app/lib/stripe";
 import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
+import { buildCreditMetadataUpdate } from "@/app/lib/credit-metadata";
 import type Stripe from "stripe";
 
 export const runtime = "nodejs";
@@ -119,14 +120,6 @@ type StripeInvoiceLike = {
   subscription?: string | StripeSubscriptionLike | null;
 };
 
-type CreditAdjustmentEntry = {
-  at: string;
-  admin: string;
-  before: number;
-  after: number;
-  reason: string;
-};
-
 type StripeExpandableRef = string | { id: string } | null | undefined;
 
 function getCustomerId(customer: StripeSubscriptionLike["customer"]) {
@@ -162,16 +155,23 @@ async function syncSubscriptionMetadata(subscription: StripeSubscriptionLike) {
 
     if (!plan) return;
 
+    const currentCredits =
+      (user.unsafeMetadata?.credits as number | undefined) ??
+      DEFAULT_NEW_USER_CREDITS;
+
     await client.users.updateUserMetadata(clerkUserId, {
-      unsafeMetadata: {
-        ...user.unsafeMetadata,
-        stripeCustomerId: getCustomerId(subscription.customer),
-        stripeSubscriptionId: subscription.id,
-        subscriptionStatus: subscription.status,
-        currentPlan: plan.id,
-        subscriptionPeriodStart: subscription.current_period_start,
-        subscriptionPeriodEnd: subscription.current_period_end,
-      },
+      unsafeMetadata: buildCreditMetadataUpdate({
+        metadata: {
+          ...user.unsafeMetadata,
+          stripeCustomerId: getCustomerId(subscription.customer),
+          stripeSubscriptionId: subscription.id,
+          subscriptionStatus: subscription.status,
+          currentPlan: plan.id,
+          subscriptionPeriodStart: subscription.current_period_start,
+          subscriptionPeriodEnd: subscription.current_period_end,
+        },
+        credits: currentCredits,
+      }),
     });
 
     console.log(`Synced subscription for user ${clerkUserId}: ${plan.name}`);
@@ -206,33 +206,28 @@ async function grantSubscriptionCredits(
       (user.unsafeMetadata?.credits as number | undefined) ??
       DEFAULT_NEW_USER_CREDITS;
     const newCredits = currentCredits + plan.credits;
-    const existingLog =
-      (user.unsafeMetadata?.creditAdjustments as
-        | CreditAdjustmentEntry[]
-        | undefined) ?? [];
 
     await client.users.updateUserMetadata(clerkUserId, {
-      unsafeMetadata: {
-        ...user.unsafeMetadata,
-        stripeCustomerId: getCustomerId(subscription.customer),
-        stripeSubscriptionId: subscription.id,
-        subscriptionStatus: subscription.status,
-        currentPlan: plan.id,
-        subscriptionPeriodStart: subscription.current_period_start,
-        subscriptionPeriodEnd: subscription.current_period_end,
+      unsafeMetadata: buildCreditMetadataUpdate({
+        metadata: {
+          ...user.unsafeMetadata,
+          processedStripeInvoices: [...processedInvoices, invoiceId].slice(-50),
+          stripeCustomerId: getCustomerId(subscription.customer),
+          stripeSubscriptionId: subscription.id,
+          subscriptionStatus: subscription.status,
+          currentPlan: plan.id,
+          subscriptionPeriodStart: subscription.current_period_start,
+          subscriptionPeriodEnd: subscription.current_period_end,
+        },
         credits: newCredits,
-        processedStripeInvoices: [...processedInvoices, invoiceId].slice(-100),
-        creditAdjustments: [
-          ...existingLog,
-          {
-            at: new Date().toISOString(),
-            admin: "stripe",
-            before: currentCredits,
-            after: newCredits,
-            reason: `Stripe ${plan.name} subscription credit grant (${invoiceId})`,
-          },
-        ].slice(-100),
-      },
+        adjustmentEntry: {
+          at: new Date().toISOString(),
+          admin: "stripe",
+          before: currentCredits,
+          after: newCredits,
+          reason: `Stripe ${plan.name} subscription credit grant (${invoiceId})`,
+        },
+      }),
     });
 
     console.log(
@@ -250,13 +245,19 @@ async function handleSubscriptionDeleted(subscription: StripeSubscriptionLike) {
   try {
     const client = await clerkClient();
     const user = await client.users.getUser(clerkUserId);
+    const currentCredits =
+      (user.unsafeMetadata?.credits as number | undefined) ??
+      DEFAULT_NEW_USER_CREDITS;
 
     await client.users.updateUserMetadata(clerkUserId, {
-      unsafeMetadata: {
-        ...user.unsafeMetadata,
-        subscriptionStatus: "canceled",
-        currentPlan: null,
-      },
+      unsafeMetadata: buildCreditMetadataUpdate({
+        metadata: {
+          ...user.unsafeMetadata,
+          subscriptionStatus: "canceled",
+          currentPlan: null,
+        },
+        credits: currentCredits,
+      }),
     });
 
     console.log(`Canceled subscription for user ${clerkUserId}`);
@@ -287,12 +288,18 @@ async function handlePaymentFailed(invoice: StripeInvoiceLike) {
 
     const client = await clerkClient();
     const user = await client.users.getUser(clerkUserId);
+    const currentCredits =
+      (user.unsafeMetadata?.credits as number | undefined) ??
+      DEFAULT_NEW_USER_CREDITS;
 
     await client.users.updateUserMetadata(clerkUserId, {
-      unsafeMetadata: {
-        ...user.unsafeMetadata,
-        subscriptionStatus: "past_due",
-      },
+      unsafeMetadata: buildCreditMetadataUpdate({
+        metadata: {
+          ...user.unsafeMetadata,
+          subscriptionStatus: "past_due",
+        },
+        credits: currentCredits,
+      }),
     });
 
     console.log(`Payment failed for user ${clerkUserId}`);
@@ -331,32 +338,27 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
       (user.unsafeMetadata?.credits as number | undefined) ??
       DEFAULT_NEW_USER_CREDITS;
     const newCredits = currentCredits + pack.credits;
-    const existingLog =
-      (user.unsafeMetadata?.creditAdjustments as
-        | CreditAdjustmentEntry[]
-        | undefined) ?? [];
     const stripeCustomerId = getExpandableId(session.customer);
 
     await client.users.updateUserMetadata(clerkUserId, {
-      unsafeMetadata: {
-        ...user.unsafeMetadata,
-        ...(stripeCustomerId ? { stripeCustomerId } : {}),
+      unsafeMetadata: buildCreditMetadataUpdate({
+        metadata: {
+          ...user.unsafeMetadata,
+          ...(stripeCustomerId ? { stripeCustomerId } : {}),
+          processedStripeCheckoutSessions: [
+            ...processedSessions,
+            session.id,
+          ].slice(-50),
+        },
         credits: newCredits,
-        processedStripeCheckoutSessions: [
-          ...processedSessions,
-          session.id,
-        ].slice(-100),
-        creditAdjustments: [
-          ...existingLog,
-          {
-            at: new Date().toISOString(),
-            admin: "stripe",
-            before: currentCredits,
-            after: newCredits,
-            reason: `Stripe ${pack.name} one-time credit pack (${session.id})`,
-          },
-        ].slice(-100),
-      },
+        adjustmentEntry: {
+          at: new Date().toISOString(),
+          admin: "stripe",
+          before: currentCredits,
+          after: newCredits,
+          reason: `Stripe ${pack.name} one-time credit pack (${session.id})`,
+        },
+      }),
     });
 
     console.log(

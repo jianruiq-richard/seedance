@@ -1,6 +1,7 @@
 "use server";
 
 import { clerkClient } from "@clerk/nextjs/server";
+import { buildCreditMetadataUpdate } from "@/app/lib/credit-metadata";
 import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
 function isAdminEmail(email: string | null) {
@@ -28,30 +29,17 @@ export async function updateUserCreditsWithLog(
   const beforeCredits =
     (user.unsafeMetadata?.credits as number | undefined) ??
     DEFAULT_NEW_USER_CREDITS;
-  const existingLog =
-    (user.unsafeMetadata?.creditAdjustments as
-      | {
-          at: string;
-          admin: string;
-          before: number;
-          after: number;
-          reason: string;
-        }[]
-      | undefined) ?? [];
   await client.users.updateUserMetadata(userId, {
-    unsafeMetadata: {
-      ...user.unsafeMetadata,
+    unsafeMetadata: buildCreditMetadataUpdate({
+      metadata: user.unsafeMetadata ?? {},
       credits,
-      creditAdjustments: [
-        ...existingLog,
-        {
-          at: new Date().toISOString(),
-          admin: adminEmail ?? "unknown",
-          before: beforeCredits,
-          after: credits,
-          reason,
-        },
-      ].slice(-50),
-    },
+      adjustmentEntry: {
+        at: new Date().toISOString(),
+        admin: adminEmail ?? "unknown",
+        before: beforeCredits,
+        after: credits,
+        reason,
+      },
+    }),
   });
 }

@@ -3,6 +3,7 @@ import {
   updateGenerationJobResult,
   type GenerationJob,
 } from "./generation-jobs";
+import { buildCreditMetadataUpdate } from "./credit-metadata";
 import { archiveVideoToTos } from "./tos";
 
 const apiKey = process.env.VOLCENGINE_ARK_API_KEY;
@@ -229,68 +230,35 @@ async function refundFailedGenerationJob(job: GenerationJob, reason: string) {
   }
 
   const currentCredits = (metadata.credits as number | undefined) ?? 0;
-  const creditUsage =
-    (metadata.creditUsage as
-      | {
-          at: string;
-          amount: number;
-          note?: string;
-          taskId?: string | null;
-          jobId?: string | null;
-          prompt?: string;
-          params?: {
-            ratio?: string | null;
-            resolution?: string | null;
-            duration?: number | null;
-            generateAudio?: boolean | null;
-          };
-        }[]
-      | undefined) ?? [];
-  const creditAdjustments =
-    (metadata.creditAdjustments as
-      | {
-          at: string;
-          admin: string;
-          before: number;
-          after: number;
-          reason: string;
-        }[]
-      | undefined) ?? [];
   const nextCredits = currentCredits + job.creditsCharged;
 
   await client.users.updateUserMetadata(job.clerkUserId, {
-    unsafeMetadata: {
-      ...metadata,
+    unsafeMetadata: buildCreditMetadataUpdate({
+      metadata,
       credits: nextCredits,
-      refundedGenerationJobIds: [...refundedJobIds, job.id].slice(-200),
-      creditUsage: [
-        ...creditUsage,
-        {
-          at: new Date().toISOString(),
-          amount: job.creditsCharged,
-          note: "Refund failed generation",
-          taskId: job.upstreamTaskId,
-          jobId: job.id,
-          prompt: job.prompt.slice(0, 240),
-          params: {
-            ratio: job.ratio,
-            resolution: job.resolution,
-            duration: job.duration,
-            generateAudio: job.generateAudio,
-          },
+      refundedGenerationJobId: job.id,
+      usageEntry: {
+        at: new Date().toISOString(),
+        amount: job.creditsCharged,
+        note: "Refund failed generation",
+        taskId: job.upstreamTaskId,
+        jobId: job.id,
+        prompt: job.prompt.slice(0, 120),
+        params: {
+          ratio: job.ratio,
+          resolution: job.resolution,
+          duration: job.duration,
+          generateAudio: job.generateAudio,
         },
-      ].slice(-100),
-      creditAdjustments: [
-        ...creditAdjustments,
-        {
-          at: new Date().toISOString(),
-          admin: "system",
-          before: currentCredits,
-          after: nextCredits,
-          reason: `Refund failed generation ${job.upstreamTaskId ?? job.id}: ${reason.slice(0, 180)}`,
-        },
-      ].slice(-50),
-    },
+      },
+      adjustmentEntry: {
+        at: new Date().toISOString(),
+        admin: "system",
+        before: currentCredits,
+        after: nextCredits,
+        reason: `Refund failed generation ${job.upstreamTaskId ?? job.id}: ${reason.slice(0, 180)}`,
+      },
+    }),
   });
 }
 

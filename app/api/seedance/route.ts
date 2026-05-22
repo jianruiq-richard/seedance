@@ -6,6 +6,7 @@ import {
   DEFAULT_NEW_USER_CREDITS,
   seedanceModels,
 } from "../../lib/credits";
+import { buildCreditMetadataUpdate } from "../../lib/credit-metadata";
 import {
   createGenerationJob,
   getGenerationJobForUser,
@@ -46,22 +47,6 @@ type GenerateRequest = {
   draft?: boolean;
   execution_expires_after?: number;
   return_last_frame?: boolean;
-};
-
-type CreditUsageEntry = {
-  at: string;
-  amount: number;
-  note?: string;
-  taskId?: string | null;
-  prompt?: string;
-  params?: {
-    ratio?: string;
-    resolution?: string;
-    duration?: number;
-    inputVideoDuration?: number;
-    generateAudio?: boolean;
-    model?: string;
-  };
 };
 
 function requireConfig() {
@@ -289,6 +274,22 @@ export async function POST(request: Request) {
   const generationMode = imageUrl ? "image" : "text";
   const promptForLog = prompt || "(media reference)";
   const requestId = crypto.randomUUID();
+  const updatedCredits = Math.max(currentCredits - creditCost.credits, 0);
+  const chargeUsageEntry = {
+    at: new Date().toISOString(),
+    amount: -creditCost.credits,
+    note: `Generate (${generationMode})`,
+    taskId: null,
+    prompt: promptForLog.slice(0, 120),
+    params: {
+      ratio,
+      resolution,
+      duration,
+      inputVideoDuration,
+      generateAudio,
+      model,
+    },
+  };
   const seedancePayload = {
     model,
     content,
@@ -304,6 +305,30 @@ export async function POST(request: Request) {
   };
 
   let data: { id?: string };
+
+  try {
+    await client.users.updateUserMetadata(userId, {
+      unsafeMetadata: buildCreditMetadataUpdate({
+        metadata: clerkUser.unsafeMetadata ?? {},
+        credits: updatedCredits,
+        usageEntry: chargeUsageEntry,
+      }),
+    });
+  } catch (error) {
+    console.error("Failed to reserve credits for Seedance task:", {
+      requestId,
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return NextResponse.json(
+      {
+        error: "Unable to reserve credits",
+        requestId,
+        detail: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 }
+    );
+  }
 
   try {
     console.info("Seedance task creation starting:", {
@@ -329,7 +354,7 @@ export async function POST(request: Request) {
   } catch (error) {
     const errorDetail =
       error instanceof SeedanceRequestError
-        ? error.detail
+        ? (error.detail ?? error.message)
         : error instanceof Error
           ? error.message
           : "Unknown error";
@@ -349,6 +374,50 @@ export async function POST(request: Request) {
       upstreamStatus:
         error instanceof SeedanceRequestError ? error.status : undefined,
     });
+
+    try {
+      const latestUser = await client.users.getUser(userId);
+      const latestMetadata = latestUser.unsafeMetadata ?? {};
+      const latestCredits =
+        (latestMetadata.credits as number | undefined) ?? updatedCredits;
+      await client.users.updateUserMetadata(userId, {
+        unsafeMetadata: buildCreditMetadataUpdate({
+          metadata: latestMetadata,
+          credits: latestCredits + creditCost.credits,
+          usageEntry: {
+            at: new Date().toISOString(),
+            amount: creditCost.credits,
+            note: "Refund failed task creation",
+            taskId: null,
+            prompt: promptForLog.slice(0, 120),
+            params: {
+              ratio,
+              resolution,
+              duration,
+              inputVideoDuration,
+              generateAudio,
+              model,
+            },
+          },
+          adjustmentEntry: {
+            at: new Date().toISOString(),
+            admin: "system",
+            before: latestCredits,
+            after: latestCredits + creditCost.credits,
+            reason: `Refund failed Seedance task creation ${requestId}: ${errorDetail.slice(0, 120)}`,
+          },
+        }),
+      });
+    } catch (refundError) {
+      console.error("Failed to refund Seedance task creation failure:", {
+        requestId,
+        userId,
+        error:
+          refundError instanceof Error
+            ? refundError.message
+            : String(refundError),
+      });
+    }
 
     try {
       await createGenerationJob({
@@ -392,50 +461,32 @@ export async function POST(request: Request) {
   }
 
   const taskId = data.id ?? null;
-  const generationJob = await createGenerationJob({
-    clerkUserId: userId,
-    upstreamTaskId: taskId,
-    mode: generationMode,
-    prompt: promptForLog,
-    imageUrl,
-    creditsCharged: creditCost.credits,
-    ratio,
-    resolution,
-    duration,
-    generateAudio,
-  });
-  const updatedCredits = Math.max(currentCredits - creditCost.credits, 0);
-  const usageLog =
-    (clerkUser.unsafeMetadata?.creditUsage as CreditUsageEntry[] | undefined) ??
-    [];
-
-  await client.users.updateUserMetadata(userId, {
-    unsafeMetadata: {
-      ...clerkUser.unsafeMetadata,
-      credits: updatedCredits,
-      creditUsage: [
-        ...usageLog,
-        {
-          at: new Date().toISOString(),
-          amount: -creditCost.credits,
-          note: `Generate (${generationMode})`,
-          taskId,
-          prompt: promptForLog.slice(0, 240),
-          params: {
-            ratio,
-            resolution,
-            duration,
-            inputVideoDuration,
-            generateAudio,
-            model,
-          },
-        },
-      ].slice(-100),
-    },
-  });
+  let generationJob: Awaited<ReturnType<typeof createGenerationJob>> | null =
+    null;
+  try {
+    generationJob = await createGenerationJob({
+      clerkUserId: userId,
+      upstreamTaskId: taskId,
+      mode: generationMode,
+      prompt: promptForLog,
+      imageUrl,
+      creditsCharged: creditCost.credits,
+      ratio,
+      resolution,
+      duration,
+      generateAudio,
+    });
+  } catch (error) {
+    console.error("Failed to record Seedance generation job:", {
+      requestId,
+      userId,
+      taskId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   return NextResponse.json({
-    jobId: generationJob.id,
+    jobId: generationJob?.id ?? null,
     taskId,
     status: "queued",
     creditsCharged: creditCost.credits,
