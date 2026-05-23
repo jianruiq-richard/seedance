@@ -148,11 +148,11 @@ async function fetchSeedanceJson<T>(
     } catch (error) {
       lastError = error;
 
-      if (
-        error instanceof SeedanceRequestError ||
-        attempt === attempts ||
-        !isRetryableNetworkError(error)
-      ) {
+      if (error instanceof SeedanceRequestError) {
+        throw error;
+      }
+
+      if (attempt === attempts || !isRetryableNetworkError(error)) {
         break;
       }
 
