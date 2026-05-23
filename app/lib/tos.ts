@@ -30,6 +30,9 @@ function createClient() {
     region,
     endpoint: normalizeTosEndpoint(endpoint),
     secure: true,
+    connectionTimeout: 30000,
+    requestTimeout: 120000,
+    maxRetryCount: 3,
   });
 }
 

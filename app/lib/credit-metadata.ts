@@ -25,9 +25,23 @@ type CreditAdjustmentEntry = {
 
 type UnsafeMetadata = Record<string, unknown>;
 
-const MAX_CREDIT_USAGE_ENTRIES = 20;
-const MAX_CREDIT_ADJUSTMENT_ENTRIES = 20;
-const MAX_REFUNDED_JOB_IDS = 100;
+const MAX_CREDIT_USAGE_ENTRIES = 10;
+const MAX_CREDIT_ADJUSTMENT_ENTRIES = 10;
+const MAX_REFUNDED_JOB_IDS = 40;
+const MAX_STRIPE_DEDUPE_IDS = 50;
+
+const PRESERVED_METADATA_KEYS = new Set([
+  "credits",
+  "creditUsage",
+  "creditAdjustments",
+  "refundedGenerationJobIds",
+  "currentPlan",
+  "subscriptionStatus",
+  "stripeCustomerId",
+  "stripeSubscriptionId",
+  "processedStripeInvoices",
+  "processedStripeCheckoutSessions",
+]);
 
 function trimText(value: unknown, maxLength: number) {
   return typeof value === "string" ? value.slice(0, maxLength) : undefined;
@@ -94,6 +108,60 @@ function normalizeStringArray(value: unknown) {
     : [];
 }
 
+function nullableString(value: unknown) {
+  return typeof value === "string" ? value : value === null ? null : undefined;
+}
+
+function compactPreservedMetadata(metadata: UnsafeMetadata) {
+  const compact: UnsafeMetadata = {};
+
+  for (const key of Object.keys(metadata)) {
+    if (!PRESERVED_METADATA_KEYS.has(key)) {
+      compact[key] = null;
+    }
+  }
+
+  const currentPlan = nullableString(metadata.currentPlan);
+  const subscriptionStatus = nullableString(metadata.subscriptionStatus);
+  const stripeCustomerId = nullableString(metadata.stripeCustomerId);
+  const stripeSubscriptionId = nullableString(metadata.stripeSubscriptionId);
+
+  if (currentPlan !== undefined || "currentPlan" in metadata) {
+    compact.currentPlan = currentPlan ?? null;
+  }
+  if (subscriptionStatus !== undefined || "subscriptionStatus" in metadata) {
+    compact.subscriptionStatus = subscriptionStatus ?? null;
+  }
+  if (stripeCustomerId !== undefined || "stripeCustomerId" in metadata) {
+    compact.stripeCustomerId = stripeCustomerId ?? null;
+  }
+  if (stripeSubscriptionId !== undefined || "stripeSubscriptionId" in metadata) {
+    compact.stripeSubscriptionId = stripeSubscriptionId ?? null;
+  }
+
+  const processedStripeInvoices = normalizeStringArray(
+    metadata.processedStripeInvoices
+  ).slice(-MAX_STRIPE_DEDUPE_IDS);
+  const processedStripeCheckoutSessions = normalizeStringArray(
+    metadata.processedStripeCheckoutSessions
+  ).slice(-MAX_STRIPE_DEDUPE_IDS);
+
+  if (
+    processedStripeInvoices.length > 0 ||
+    "processedStripeInvoices" in metadata
+  ) {
+    compact.processedStripeInvoices = processedStripeInvoices;
+  }
+  if (
+    processedStripeCheckoutSessions.length > 0 ||
+    "processedStripeCheckoutSessions" in metadata
+  ) {
+    compact.processedStripeCheckoutSessions = processedStripeCheckoutSessions;
+  }
+
+  return compact;
+}
+
 export function buildCreditMetadataUpdate({
   metadata,
   credits,
@@ -131,7 +199,7 @@ export function buildCreditMetadataUpdate({
   ].slice(-MAX_REFUNDED_JOB_IDS);
 
   return {
-    ...metadata,
+    ...compactPreservedMetadata(metadata),
     credits,
     creditUsage,
     creditAdjustments,

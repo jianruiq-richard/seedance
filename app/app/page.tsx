@@ -798,6 +798,11 @@ export default function AppPage() {
                 const progress = uploadProgress[kind];
                 const isUploading = uploading[kind];
                 const isReady = Boolean(referenceUrls[kind]) && !isUploading;
+                const visibleProgress = isReady
+                  ? 100
+                  : isUploading
+                    ? Math.min(progress, 95)
+                    : progress;
                 if (!file || !preview) return null;
 
                 return (
@@ -860,15 +865,15 @@ export default function AppPage() {
                     <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
                       <div
                         className="h-full rounded-full bg-[#f7c578] transition-all"
-                        style={{ width: `${progress}%` }}
+                        style={{ width: `${visibleProgress}%` }}
                       />
                     </div>
-                    {progress > 0 && progress < 100 && (
+                    {isUploading && visibleProgress < 95 && (
                       <p className="mt-2 text-xs text-white/60">
-                        Uploading... {progress}%
+                        Uploading... {visibleProgress}%
                       </p>
                     )}
-                    {progress >= 100 && isUploading && (
+                    {isUploading && visibleProgress >= 95 && (
                       <p className="mt-2 text-xs text-white/60">
                         Processing upload...
                       </p>

@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import crypto from "crypto";
-import { TosClient, TosClientError, TosServerError, ACLType } from "@volcengine/tos-sdk";
+import {
+  TosClient,
+  TosClientError,
+  TosServerError,
+  ACLType,
+} from "@volcengine/tos-sdk";
 import { requireAllowedEmailUser } from "@/app/lib/server-email-access";
 
 export const runtime = "nodejs";
@@ -34,7 +39,57 @@ function createClient() {
     region,
     endpoint: normalizeTosEndpoint(endpoint),
     secure: true,
+    connectionTimeout: 30000,
+    requestTimeout: 120000,
+    maxRetryCount: 3,
   });
+}
+
+function serializeUploadError(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return { message: String(error) };
+  }
+
+  const record = error as Record<string, unknown>;
+  const cause =
+    record.cause && typeof record.cause === "object"
+      ? (record.cause as Record<string, unknown>)
+      : null;
+
+  return {
+    name: error instanceof Error ? error.name : undefined,
+    message: error instanceof Error ? error.message : String(error),
+    code: typeof record.code === "string" ? record.code : undefined,
+    statusCode:
+      typeof record.statusCode === "number" ? record.statusCode : undefined,
+    requestId:
+      typeof record.requestId === "string" ? record.requestId : undefined,
+    cause: cause
+      ? {
+          name: typeof cause.name === "string" ? cause.name : undefined,
+          message:
+            typeof cause.message === "string" ? cause.message : undefined,
+          code: typeof cause.code === "string" ? cause.code : undefined,
+        }
+      : undefined,
+    errors: Array.isArray(record.errors)
+      ? record.errors.map((item) => {
+          if (!item || typeof item !== "object") {
+            return { message: String(item) };
+          }
+          const nested = item as Record<string, unknown>;
+          return {
+            name: typeof nested.name === "string" ? nested.name : undefined,
+            message:
+              typeof nested.message === "string" ? nested.message : undefined,
+            code: typeof nested.code === "string" ? nested.code : undefined,
+            address:
+              typeof nested.address === "string" ? nested.address : undefined,
+            port: typeof nested.port === "number" ? nested.port : undefined,
+          };
+        })
+      : undefined,
+  };
 }
 
 export async function POST(request: Request) {
@@ -79,6 +134,17 @@ export async function POST(request: Request) {
       acl: ACLType.ACLPublicRead,
     });
   } catch (error) {
+    const serializedError = serializeUploadError(error);
+    console.error("TOS upload failed:", {
+      userId,
+      key,
+      endpoint: normalizeTosEndpoint(endpoint!),
+      bucket,
+      contentType,
+      size: buffer.length,
+      error: serializedError,
+    });
+
     if (error instanceof TosClientError) {
       return NextResponse.json(
         { error: "Upload failed", detail: error.message },
@@ -98,7 +164,11 @@ export async function POST(request: Request) {
       );
     }
     return NextResponse.json(
-      { error: "Upload failed", detail: String(error) },
+      {
+        error: "Upload failed",
+        detail:
+          error instanceof Error ? error.message : serializedError.message,
+      },
       { status: 500 }
     );
   }
