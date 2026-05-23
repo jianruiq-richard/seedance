@@ -211,6 +211,11 @@ export default function AppPage() {
     return "Finalizing video";
   }, [renderProgress]);
 
+  const hasActiveUpload = useMemo(
+    () => Object.values(uploading).some(Boolean),
+    [uploading]
+  );
+
   const availableResolutions = useMemo(
     () =>
       model === "doubao-seedance-2-0-fast-260128"
@@ -791,6 +796,8 @@ export default function AppPage() {
                 const file = referenceFiles[kind];
                 const preview = referencePreviews[kind];
                 const progress = uploadProgress[kind];
+                const isUploading = uploading[kind];
+                const isReady = Boolean(referenceUrls[kind]) && !isUploading;
                 if (!file || !preview) return null;
 
                 return (
@@ -859,6 +866,16 @@ export default function AppPage() {
                     {progress > 0 && progress < 100 && (
                       <p className="mt-2 text-xs text-white/60">
                         Uploading... {progress}%
+                      </p>
+                    )}
+                    {progress >= 100 && isUploading && (
+                      <p className="mt-2 text-xs text-white/60">
+                        Processing upload...
+                      </p>
+                    )}
+                    {isReady && (
+                      <p className="mt-2 text-xs text-emerald-200">
+                        Ready
                       </p>
                     )}
                   </div>
@@ -1007,11 +1024,13 @@ export default function AppPage() {
                 status === "generating" ||
                 pricingLoading ||
                 Boolean(pricingError) ||
-                Object.values(uploading).some(Boolean)
+                hasActiveUpload
               }
             >
               {status === "generating" ? (
                 "Generating..."
+              ) : hasActiveUpload ? (
+                "Finishing upload..."
               ) : pricingLoading ? (
                 <span className="inline-flex items-center justify-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0a0b10] border-t-transparent" />

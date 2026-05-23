@@ -463,7 +463,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        error: "Seedance request failed",
+        error: errorDetail,
         requestId,
         region: process.env.VERCEL_REGION ?? null,
         upstreamStatus:

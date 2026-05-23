@@ -29,9 +29,13 @@ type SeedanceFetchOptions = {
   method: "GET" | "POST";
   body?: unknown;
   timeoutMs?: number;
+  retryDelaysMs?: number[];
 };
 
-const SEEDANCE_RETRY_DELAYS_MS = [750, 2000];
+const DEFAULT_SEEDANCE_TIMEOUT_MS = 30000;
+const CREATE_SEEDANCE_TIMEOUT_MS = 45000;
+const SEEDANCE_RETRY_DELAYS_MS = [750, 2000, 5000, 10000];
+const SYSTEM_BUSY_MESSAGE = "System Busy. Please retry again later.";
 const RETRYABLE_NETWORK_ERROR_CODES = new Set([
   "ECONNRESET",
   "ETIMEDOUT",
@@ -105,18 +109,31 @@ function isRetryableNetworkError(error: unknown) {
   );
 }
 
+function getUserFacingNetworkErrorDetail(error: unknown) {
+  return isRetryableNetworkError(error)
+    ? SYSTEM_BUSY_MESSAGE
+    : error instanceof Error
+      ? error.message
+      : String(error);
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchSeedanceJson<T>(
   path: string,
-  { method, body, timeoutMs = 30000 }: SeedanceFetchOptions
+  {
+    method,
+    body,
+    timeoutMs = DEFAULT_SEEDANCE_TIMEOUT_MS,
+    retryDelaysMs = SEEDANCE_RETRY_DELAYS_MS,
+  }: SeedanceFetchOptions
 ) {
   requireSeedanceConfig();
 
   const url = `${getBaseUrl()}${path}`;
-  const attempts = SEEDANCE_RETRY_DELAYS_MS.length + 1;
+  const attempts = retryDelaysMs.length + 1;
   let lastError: unknown = null;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -156,7 +173,7 @@ async function fetchSeedanceJson<T>(
         break;
       }
 
-      await sleep(SEEDANCE_RETRY_DELAYS_MS[attempt - 1]);
+      await sleep(retryDelaysMs[attempt - 1]);
     } finally {
       clearTimeout(timeout);
     }
@@ -165,7 +182,7 @@ async function fetchSeedanceJson<T>(
   throw new SeedanceRequestError("Seedance request failed", {
     cause: lastError,
     causeCode: getErrorCode(lastError),
-    detail: lastError instanceof Error ? lastError.message : String(lastError),
+    detail: getUserFacingNetworkErrorDetail(lastError),
   });
 }
 
@@ -193,6 +210,8 @@ export async function createSeedanceTask(body: Record<string, unknown>) {
   return fetchSeedanceJson<{ id?: string }>("/contents/generations/tasks", {
     method: "POST",
     body,
+    timeoutMs: CREATE_SEEDANCE_TIMEOUT_MS,
+    retryDelaysMs: [1000, 3000, 7000, 15000, 25000],
   });
 }
 
