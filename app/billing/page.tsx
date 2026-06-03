@@ -136,10 +136,10 @@ export default function BillingPage() {
                 <p className="mt-1 text-xs text-white/60">
                   Contact our support team at{" "}
                   <a
-                    href="mailto:support@seedance.technology"
+                    href="mailto:contact@astromar.org"
                     className="text-[#f7c578] hover:underline"
                   >
-                    support@seedance.technology
+                    contact@astromar.org
                   </a>
                 </p>
               </div>
