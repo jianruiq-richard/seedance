@@ -99,6 +99,8 @@ type StripeSubscriptionLike = {
   customer: string | { id: string };
   metadata?: Record<string, string> | null;
   status?: string;
+  cancel_at?: number | null;
+  cancel_at_period_end?: boolean;
   current_period_start?: number;
   current_period_end?: number;
   items: {
@@ -166,6 +168,9 @@ async function syncSubscriptionMetadata(subscription: StripeSubscriptionLike) {
           stripeCustomerId: getCustomerId(subscription.customer),
           stripeSubscriptionId: subscription.id,
           subscriptionStatus: subscription.status,
+          subscriptionCancelAtPeriodEnd:
+            subscription.cancel_at_period_end ?? false,
+          subscriptionCancelAt: subscription.cancel_at ?? null,
           currentPlan: plan.id,
           subscriptionPeriodStart: subscription.current_period_start,
           subscriptionPeriodEnd: subscription.current_period_end,
@@ -215,6 +220,9 @@ async function grantSubscriptionCredits(
           stripeCustomerId: getCustomerId(subscription.customer),
           stripeSubscriptionId: subscription.id,
           subscriptionStatus: subscription.status,
+          subscriptionCancelAtPeriodEnd:
+            subscription.cancel_at_period_end ?? false,
+          subscriptionCancelAt: subscription.cancel_at ?? null,
           currentPlan: plan.id,
           subscriptionPeriodStart: subscription.current_period_start,
           subscriptionPeriodEnd: subscription.current_period_end,
@@ -254,6 +262,8 @@ async function handleSubscriptionDeleted(subscription: StripeSubscriptionLike) {
         metadata: {
           ...user.unsafeMetadata,
           subscriptionStatus: "canceled",
+          subscriptionCancelAtPeriodEnd: null,
+          subscriptionCancelAt: null,
           currentPlan: null,
         },
         credits: currentCredits,

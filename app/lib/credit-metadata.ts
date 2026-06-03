@@ -37,6 +37,10 @@ const PRESERVED_METADATA_KEYS = new Set([
   "refundedGenerationJobIds",
   "currentPlan",
   "subscriptionStatus",
+  "subscriptionCancelAtPeriodEnd",
+  "subscriptionCancelAt",
+  "subscriptionPeriodStart",
+  "subscriptionPeriodEnd",
   "stripeCustomerId",
   "stripeSubscriptionId",
   "processedStripeInvoices",
@@ -112,6 +116,10 @@ function nullableString(value: unknown) {
   return typeof value === "string" ? value : value === null ? null : undefined;
 }
 
+function nullableNumber(value: unknown) {
+  return typeof value === "number" ? value : value === null ? null : undefined;
+}
+
 function compactPreservedMetadata(metadata: UnsafeMetadata) {
   const compact: UnsafeMetadata = {};
 
@@ -123,6 +131,17 @@ function compactPreservedMetadata(metadata: UnsafeMetadata) {
 
   const currentPlan = nullableString(metadata.currentPlan);
   const subscriptionStatus = nullableString(metadata.subscriptionStatus);
+  const subscriptionCancelAt = nullableNumber(metadata.subscriptionCancelAt);
+  const subscriptionPeriodStart = nullableNumber(
+    metadata.subscriptionPeriodStart
+  );
+  const subscriptionPeriodEnd = nullableNumber(metadata.subscriptionPeriodEnd);
+  const subscriptionCancelAtPeriodEnd =
+    typeof metadata.subscriptionCancelAtPeriodEnd === "boolean"
+      ? metadata.subscriptionCancelAtPeriodEnd
+      : metadata.subscriptionCancelAtPeriodEnd === null
+        ? null
+        : undefined;
   const stripeCustomerId = nullableString(metadata.stripeCustomerId);
   const stripeSubscriptionId = nullableString(metadata.stripeSubscriptionId);
 
@@ -131,6 +150,31 @@ function compactPreservedMetadata(metadata: UnsafeMetadata) {
   }
   if (subscriptionStatus !== undefined || "subscriptionStatus" in metadata) {
     compact.subscriptionStatus = subscriptionStatus ?? null;
+  }
+  if (
+    subscriptionCancelAtPeriodEnd !== undefined ||
+    "subscriptionCancelAtPeriodEnd" in metadata
+  ) {
+    compact.subscriptionCancelAtPeriodEnd =
+      subscriptionCancelAtPeriodEnd ?? null;
+  }
+  if (
+    subscriptionCancelAt !== undefined ||
+    "subscriptionCancelAt" in metadata
+  ) {
+    compact.subscriptionCancelAt = subscriptionCancelAt ?? null;
+  }
+  if (
+    subscriptionPeriodStart !== undefined ||
+    "subscriptionPeriodStart" in metadata
+  ) {
+    compact.subscriptionPeriodStart = subscriptionPeriodStart ?? null;
+  }
+  if (
+    subscriptionPeriodEnd !== undefined ||
+    "subscriptionPeriodEnd" in metadata
+  ) {
+    compact.subscriptionPeriodEnd = subscriptionPeriodEnd ?? null;
   }
   if (stripeCustomerId !== undefined || "stripeCustomerId" in metadata) {
     compact.stripeCustomerId = stripeCustomerId ?? null;

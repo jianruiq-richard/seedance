@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
+import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
+import { buildCreditMetadataUpdate } from "@/app/lib/credit-metadata";
 import { createStripeClient } from "@/app/lib/stripe";
 
 export const runtime = "nodejs";
@@ -39,11 +42,37 @@ export async function POST(request: Request) {
         cancel_at_period_end: true,
       }
     );
+    const updatedSubscriptionMetadata =
+      updatedSubscription as typeof updatedSubscription & {
+        current_period_end?: number;
+      };
+
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    const currentCredits =
+      (user.unsafeMetadata?.credits as number | undefined) ??
+      DEFAULT_NEW_USER_CREDITS;
+
+    await client.users.updateUserMetadata(userId, {
+      unsafeMetadata: buildCreditMetadataUpdate({
+        metadata: {
+          ...user.unsafeMetadata,
+          subscriptionStatus: updatedSubscription.status,
+          subscriptionCancelAtPeriodEnd:
+            updatedSubscription.cancel_at_period_end,
+          subscriptionCancelAt: updatedSubscription.cancel_at,
+          subscriptionPeriodEnd:
+            updatedSubscriptionMetadata.current_period_end,
+        },
+        credits: currentCredits,
+      }),
+    });
 
     return NextResponse.json({
       success: true,
-      cancelAt: (updatedSubscription as any).cancel_at,
-      currentPeriodEnd: (updatedSubscription as any).current_period_end,
+      cancelAt: updatedSubscription.cancel_at,
+      cancelAtPeriodEnd: updatedSubscription.cancel_at_period_end,
+      currentPeriodEnd: updatedSubscriptionMetadata.current_period_end,
     });
   } catch (error) {
     console.error("Stripe cancel subscription error:", error);

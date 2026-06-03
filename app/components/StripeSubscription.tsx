@@ -16,6 +16,16 @@ type Props = {
   showCreditPacks?: boolean;
 };
 
+function formatSubscriptionDate(timestamp: number | null | undefined) {
+  if (!timestamp) return null;
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(timestamp * 1000));
+}
+
 export default function StripeSubscription({
   onSubscriptionUpdated,
   disabled,
@@ -28,11 +38,21 @@ export default function StripeSubscription({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
+  const [localCancelAt, setLocalCancelAt] = useState<number | null>(null);
 
   // Get current subscription info from user metadata
   const currentPlan = user?.unsafeMetadata?.currentPlan as string | undefined;
   const subscriptionStatus = user?.unsafeMetadata?.subscriptionStatus as string | undefined;
   const stripeSubscriptionId = user?.unsafeMetadata?.stripeSubscriptionId as string | undefined;
+  const subscriptionCancelAtPeriodEnd =
+    user?.unsafeMetadata?.subscriptionCancelAtPeriodEnd as boolean | undefined;
+  const subscriptionCancelAt =
+    user?.unsafeMetadata?.subscriptionCancelAt as number | undefined;
+  const isCancelScheduled =
+    Boolean(localCancelAt) || subscriptionCancelAtPeriodEnd === true;
+  const cancelAtDate = formatSubscriptionDate(
+    localCancelAt ?? subscriptionCancelAt
+  );
 
   useEffect(() => {
     fetch("/api/stripe/config")
@@ -131,8 +151,9 @@ export default function StripeSubscription({
         throw new Error(data?.error || "Failed to cancel subscription");
       }
 
+      setLocalCancelAt(data.cancelAt ?? data.currentPeriodEnd ?? null);
+      await user?.reload();
       onSubscriptionUpdated?.();
-      window.location.reload();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Cancellation failed");
     } finally {
@@ -203,10 +224,13 @@ export default function StripeSubscription({
                 Current: {SUBSCRIPTION_PLANS.find(p => p.id === currentPlan)?.name}
               </p>
               <p className="text-xs text-green-300/70">
-                Status: {subscriptionStatus}
+                Status:{" "}
+                {isCancelScheduled
+                  ? `cancels${cancelAtDate ? ` on ${cancelAtDate}` : " at period end"}`
+                  : subscriptionStatus}
               </p>
             </div>
-            {subscriptionStatus === "active" && (
+            {subscriptionStatus === "active" && !isCancelScheduled && (
               <button
                 type="button"
                 onClick={handleCancelSubscription}

@@ -7,6 +7,16 @@ import CreditPackCheckout from "@/app/components/CreditPackCheckout";
 import StripeSubscription from "@/app/components/StripeSubscription";
 import { DEFAULT_NEW_USER_CREDITS } from "@/app/lib/credits";
 
+function formatSubscriptionDate(timestamp: number | null | undefined) {
+  if (!timestamp) return null;
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(timestamp * 1000));
+}
+
 export default function BillingPage() {
   const { user } = useUser();
   const credits =
@@ -14,6 +24,11 @@ export default function BillingPage() {
     DEFAULT_NEW_USER_CREDITS;
   const currentPlan = user?.unsafeMetadata?.currentPlan as string | undefined;
   const subscriptionStatus = user?.unsafeMetadata?.subscriptionStatus as string | undefined;
+  const subscriptionCancelAtPeriodEnd =
+    user?.unsafeMetadata?.subscriptionCancelAtPeriodEnd as boolean | undefined;
+  const subscriptionCancelAt =
+    user?.unsafeMetadata?.subscriptionCancelAt as number | undefined;
+  const cancelAtDate = formatSubscriptionDate(subscriptionCancelAt);
   const [topUpSuccess, setTopUpSuccess] = useState(false);
 
   useEffect(() => {
@@ -77,7 +92,14 @@ export default function BillingPage() {
               <h3 className="text-lg font-semibold text-white">Current Plan</h3>
               <div className="mt-2 grid gap-2 text-sm text-white/70">
                 <p>Plan: <span className="text-white font-semibold capitalize">{currentPlan}</span></p>
-                <p>Status: <span className="text-white font-semibold capitalize">{subscriptionStatus}</span></p>
+                <p>
+                  Status:{" "}
+                  <span className="text-white font-semibold capitalize">
+                    {subscriptionCancelAtPeriodEnd
+                      ? `Cancels${cancelAtDate ? ` on ${cancelAtDate}` : " at period end"}`
+                      : subscriptionStatus}
+                  </span>
+                </p>
                 <p>Credits: <span className="text-white font-semibold">{credits.toLocaleString()}</span></p>
               </div>
             </div>
