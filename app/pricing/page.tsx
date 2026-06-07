@@ -18,24 +18,6 @@ export const metadata: Metadata = {
   ],
 };
 
-const modelPricing = [
-  {
-    model: "Seedance 2.0",
-    rows: [
-      ["480p", "6 credits/sec", "30 credits", "4 credits/sec", "32 credits"],
-      ["720p", "12 credits/sec", "60 credits", "8 credits/sec", "64 credits"],
-      ["1080p", "30 credits/sec", "150 credits", "20 credits/sec", "160 credits"],
-    ],
-  },
-  {
-    model: "Seedance 2.0 Fast",
-    rows: [
-      ["480p", "5 credits/sec", "25 credits", "3 credits/sec", "24 credits"],
-      ["720p", "10 credits/sec", "50 credits", "6 credits/sec", "48 credits"],
-    ],
-  },
-];
-
 const faqs = [
   {
     question: "How are Seedance 2.0 credits calculated?",
@@ -102,60 +84,6 @@ export default function PricingPage() {
                 </Link>
               </article>
             ))}
-          </div>
-        </section>
-
-        <section className="border-y border-white/10 bg-white/[0.025]">
-          <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6">
-            <div className="flex flex-wrap items-end justify-between gap-4">
-              <div>
-                <h2 className="text-2xl font-semibold text-white sm:text-3xl">
-                  Seedance Model Credit Pricing
-                </h2>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-white/60">
-                  Credits consumed per second vary by model, resolution, and
-                  whether a video reference is included. These examples help
-                  users compare common 5-second generations.
-                </p>
-              </div>
-              <Link className="text-sm font-semibold text-[#f7c578]" href="/app">
-                Estimate in studio
-              </Link>
-            </div>
-
-            <div className="mt-7 grid gap-5">
-              {modelPricing.map((model) => (
-                <div key={model.model} className="overflow-hidden rounded-2xl border border-white/10 bg-black/18">
-                  <div className="border-b border-white/10 px-5 py-4">
-                    <h3 className="font-semibold text-white">{model.model}</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full min-w-[760px] text-left text-sm">
-                      <thead className="text-xs uppercase tracking-[0.14em] text-white/38">
-                        <tr>
-                          <th className="px-5 py-3">Resolution</th>
-                          <th className="px-5 py-3">Without Video Input</th>
-                          <th className="px-5 py-3">5s Example</th>
-                          <th className="px-5 py-3">With Video Input</th>
-                          <th className="px-5 py-3">5s + 3s Input Example</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-white/8 text-white/68">
-                        {model.rows.map((row) => (
-                          <tr key={`${model.model}-${row[0]}`}>
-                            {row.map((cell) => (
-                              <td key={cell} className="px-5 py-4">
-                                {cell}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
 
