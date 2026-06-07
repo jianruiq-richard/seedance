@@ -1130,12 +1130,8 @@ export default function AppPage() {
                 </div>
               )}
             </div>
-            <div className="mt-5 grid gap-3 text-xs text-white/60 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
-              <div className="flex flex-wrap gap-3">
-                <span>Ratio: {ratio}</span>
-                <span>Duration: {duration}s</span>
-              </div>
-              {downloadUrl && (
+            {downloadUrl && (
+              <div className="mt-5 flex justify-end">
                 <a
                   className="inline-flex min-w-[132px] items-center justify-center rounded-full border border-white/20 bg-white px-4 py-2 text-center text-xs font-semibold !text-[#0a0b10] shadow-sm transition hover:bg-white/90"
                   href={downloadUrl}
@@ -1143,8 +1139,8 @@ export default function AppPage() {
                 >
                   Download video
                 </a>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="grid gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/70 sm:rounded-3xl sm:p-6">

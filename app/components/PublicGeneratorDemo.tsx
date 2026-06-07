@@ -494,16 +494,6 @@ export default function PublicGeneratorDemo() {
               />
             )}
           </div>
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-white/52">
-            <div className="flex flex-wrap gap-3">
-              <span>Ratio: {ratio}</span>
-              <span>Duration: {duration}s</span>
-              <span>Resolution: {resolution}</span>
-            </div>
-            <span>
-              {"error" in pricing ? "Estimate unavailable" : `${pricing.credits} credits`}
-            </span>
-          </div>
         </div>
 
         <div className="rounded-2xl border border-white/10 bg-black/18 p-4 sm:p-5">
