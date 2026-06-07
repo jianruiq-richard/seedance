@@ -486,7 +486,7 @@ export default function PublicGeneratorDemo() {
             ) : (
               <video
                 className="h-full w-full bg-black object-contain"
-                src="/samples/dark_barbie_sound_1080.mp4"
+                src="/samples/dark_barbie_compressed.mp4"
                 poster="/samples/dark_barbie_poster.jpg"
                 controls
                 playsInline
