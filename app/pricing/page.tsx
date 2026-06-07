@@ -100,6 +100,12 @@ export default function PricingPage() {
                   {pack.credits.toLocaleString()} credits, added once
                 </p>
                 <p className="mt-3 text-sm leading-6 text-white/52">{pack.description}</p>
+                <Link
+                  className="mt-5 inline-flex w-full justify-center rounded-2xl bg-white px-4 py-3 text-sm font-semibold !text-[#080a0f] shadow-sm transition hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-[#f7c578]/70 focus:ring-offset-2 focus:ring-offset-[#15130f]"
+                  href="/billing"
+                >
+                  Buy credits
+                </Link>
               </article>
             ))}
           </div>

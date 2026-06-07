@@ -258,7 +258,7 @@ export default function Home() {
                   </div>
                 ))}
                 <Link
-                  className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-[#080a0f] transition hover:bg-white/90"
+                  className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold !text-[#080a0f] shadow-sm transition hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-[#f7c578]/70 focus:ring-offset-2 focus:ring-offset-[#15130f]"
                   href="/pricing"
                 >
                   View Pricing
