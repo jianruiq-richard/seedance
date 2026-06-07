@@ -1,127 +1,306 @@
+import type { Metadata } from "next";
 import Link from "next/link";
-import DeferredSampleVideoPreview from "./components/DeferredSampleVideoPreview";
+import { PageShell } from "./components/MarketingShell";
+import PublicGeneratorDemo from "./components/PublicGeneratorDemo";
+import ShowcaseGallery from "./components/ShowcaseGallery";
 
-const highlights = [
+export const metadata: Metadata = {
+  title: "Seedance 2.0 AI Video Generator | Text to Video & Image to Video",
+  description:
+    "Create cinematic AI videos with Seedance 2.0. Generate text to video, image to video, video reference edits, audio synced clips, and watermark-free downloads.",
+  keywords: [
+    "Seedance 2.0",
+    "Seedance AI video",
+    "AI video generator",
+    "text to video",
+    "image to video",
+    "video to video AI",
+    "AI video with audio",
+    "AI video editing",
+    "video extension AI",
+    "reference video generator",
+  ],
+};
+
+const features = [
+  {
+    title: "Multi-Modal AI Video Creation",
+    copy: "Build videos from text prompts, image references, video references, and audio inputs. Mix assets to guide character identity, camera motion, composition, and rhythm.",
+  },
   {
     title: "Text to Video",
-    copy: "Turn a single prompt into a full sequence with cinematic pacing.",
+    copy: "Turn a written scene into a polished clip with controllable duration, aspect ratio, resolution, seed, audio, and download settings.",
   },
   {
     title: "Image to Video",
-    copy: "Upload a key frame and bring it to life with motion and depth.",
+    copy: "Upload a character, product, storyboard, logo, or first frame and animate it into a dynamic Seedance 2.0 video.",
   },
   {
-    title: "Instant Download",
-    copy: "Your render is ready to download and share the moment it finishes.",
+    title: "Video Reference & Motion Copy",
+    copy: "Use a source video to guide action, choreography, camera movement, pacing, transitions, and visual effects in the generated output.",
+  },
+  {
+    title: "Video Extension & Editing",
+    copy: "Extend a clip, connect scenes, replace objects, modify actions, and keep continuity without restarting the entire creative workflow.",
+  },
+  {
+    title: "Watermark-Free Downloads",
+    copy: "Export finished AI videos for social content, product pages, ads, storyboards, music videos, training assets, and client drafts.",
+  },
+];
+
+const useCases = [
+  "Advertising & Marketing",
+  "Product Videos",
+  "Social Media Content",
+  "Film Pre-Visualization",
+  "Music Videos",
+  "Dance & Motion Reference",
+  "Education & Training",
+  "Real Estate Tours",
+  "Architecture Visualization",
+  "Video Editing",
+  "Brand Content",
+  "Storyboarding",
+];
+
+const faqs = [
+  {
+    question: "What is Seedance 2.0?",
+    answer:
+      "Seedance 2.0 is a multi-modal AI video generation model for creating videos from text, images, video references, and audio inputs. It is useful for text to video, image to video, reference-based motion, video extension, and editing workflows.",
+  },
+  {
+    question: "Can I generate AI videos from images?",
+    answer:
+      "Yes. Upload an image as a subject, product, scene, logo, first frame, or style reference, then describe the motion and camera direction you want Seedance 2.0 to generate.",
+  },
+  {
+    question: "Does Seedance 2.0 support video references?",
+    answer:
+      "Yes. You can use video input to guide motion, action, camera movement, transitions, effects, or continuity. Credits are calculated from the selected output and the input video duration.",
+  },
+  {
+    question: "What video sizes are supported?",
+    answer:
+      "The studio supports common creator formats including 16:9, 9:16, 1:1, 4:3, 3:4, and 21:9, with resolution options up to 1080p depending on the selected model.",
+  },
+  {
+    question: "Are generated videos downloadable?",
+    answer:
+      "Yes. Finished generations can be previewed in the studio, saved in generation history, and downloaded for publishing or further editing.",
   },
 ];
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#0b0c10] text-white">
-      <div className="pointer-events-none absolute left-[-20%] top-[-30%] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,_rgba(247,197,120,0.35),_rgba(247,197,120,0))] blur-2xl" />
-      <div className="pointer-events-none absolute right-[-10%] top-[10%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,_rgba(115,190,255,0.35),_rgba(115,190,255,0))] blur-3xl" />
-      <div className="pointer-events-none absolute bottom-[-20%] left-[10%] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,_rgba(255,120,120,0.3),_rgba(255,120,120,0))] blur-3xl" />
-
-      <header className="relative z-10 mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6 sm:py-8">
-        <div className="flex min-w-0 items-center gap-2 text-base font-semibold tracking-wide sm:text-lg">
-          <span className="inline-flex h-2 w-2 rounded-full bg-[#f7c578]" />
-          <span className="truncate">Seedance AI Video</span>
-        </div>
-        <div className="flex shrink-0 items-center gap-2 text-sm sm:gap-3">
-          <Link
-            className="rounded-full border border-white/20 px-3 py-2 text-xs transition hover:border-white/60 sm:px-4 sm:text-sm"
-            href="/sign-in"
-          >
-            Sign in
-          </Link>
-          <Link
-            className="rounded-full border border-white/20 bg-white/5 px-3 py-2 text-xs text-white/85 transition hover:border-white/40 hover:bg-white/10 sm:px-4 sm:text-sm"
-            href="/app"
-            prefetch
-          >
-            Open Studio
-          </Link>
-        </div>
-      </header>
-
-      <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-col gap-10 px-4 pb-16 pt-4 sm:gap-16 sm:px-6 sm:pb-24 sm:pt-8">
-        <section className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
-          <div className="space-y-5 sm:space-y-6">
-            <div className="inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-2 text-[10px] uppercase tracking-[0.22em] text-white/60 sm:px-4 sm:text-xs sm:tracking-[0.3em]">
-              AI Video Studio
-              <span className="h-1 w-1 rounded-full bg-white/40" />
-              Seedance
-            </div>
-            <h1 className="max-w-3xl text-3xl font-semibold leading-tight sm:text-4xl md:text-5xl">
-              The AI video platform built for creators
-            </h1>
-            <p className="max-w-2xl text-sm leading-6 text-white/70 sm:text-base sm:leading-7 md:text-lg">
-              Generate videos from a prompt or a single image. Built-in pacing,
-              styles, and quality controls help your team go from idea to
-              delivery in one place.
-            </p>
-            <div className="grid gap-3 sm:flex sm:flex-wrap">
-              <Link
-                className="rounded-full border border-[#f7c578]/35 bg-[#f7c578]/10 px-6 py-3 text-center text-sm font-semibold text-[#f7c578] transition hover:bg-[#f7c578]/15"
-                href="/app"
-                prefetch
-              >
-                Generate now
-              </Link>
-              <Link
-                className="rounded-full border border-white/20 px-6 py-3 text-center text-sm font-semibold text-white/80 transition hover:border-white/60"
-                href="/sign-up"
-              >
-                Create account
-              </Link>
-            </div>
-            <div className="grid gap-2 text-xs text-white/50 sm:flex sm:flex-wrap sm:gap-6">
-              <span>As fast as 60 seconds</span>
-              <span>9:16 / 16:9 / 1:1 supported</span>
-              <span>Team templates & collaboration</span>
-            </div>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-2xl backdrop-blur sm:rounded-3xl sm:p-6">
-            <div className="flex items-center justify-between text-xs text-white/60">
-              <span>Preview</span>
-              <span className="rounded-full border border-white/20 px-2 py-1">Live</span>
-            </div>
-            <DeferredSampleVideoPreview />
-          </div>
-        </section>
-
-        <section className="grid gap-4 md:grid-cols-3 md:gap-6">
-          {highlights.map((item) => (
-            <div
-              key={item.title}
-              className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-white/70 sm:p-6"
-            >
-              <h3 className="text-base font-semibold text-white">{item.title}</h3>
-              <p className="mt-3 leading-6">{item.copy}</p>
-            </div>
-          ))}
-        </section>
-
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-5 text-sm text-white/70 sm:rounded-3xl sm:p-8 md:p-10">
-          <div className="grid gap-6 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-semibold text-white sm:text-2xl">Ready to start?</h2>
-              <p className="mt-2 max-w-xl leading-6">
-                Jump into the studio to try text-to-video, image-to-video, and
-                download workflows. Payments, API, and team features come next.
+    <PageShell>
+      <main>
+        <section className="relative overflow-hidden">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_8%,rgba(247,197,120,0.24),transparent_32rem),radial-gradient(circle_at_85%_10%,rgba(74,144,226,0.22),transparent_28rem)]" />
+          <div className="relative mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 sm:py-14">
+            <div className="mx-auto max-w-4xl text-center">
+              <p className="inline-flex rounded-full border border-white/12 bg-white/6 px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[#f7c578]">
+                Seedance 2.0 AI Video Generator
               </p>
+              <h1 className="mt-5 text-5xl font-semibold leading-tight text-white sm:text-6xl lg:text-7xl">
+                Seedance 2.0
+              </h1>
+              <p className="mx-auto mt-5 max-w-3xl text-base leading-8 text-white/68 sm:text-lg">
+                Experience multi-modal AI video creation. Combine text, images,
+                video references, and audio to generate cinematic clips with
+                controllable motion, aspect ratio, resolution, and downloads.
+              </p>
+              <div className="mt-7 flex flex-wrap justify-center gap-3">
+                <Link
+                  className="rounded-full bg-[#f7c578] px-6 py-3 text-sm font-semibold text-[#080a0f] transition hover:bg-[#ffd895]"
+                  href="/app"
+                  prefetch
+                >
+                  Start Creating Now
+                </Link>
+                <Link
+                  className="rounded-full border border-white/18 px-6 py-3 text-sm font-semibold text-white/82 transition hover:border-white/40 hover:text-white"
+                  href="/guide"
+                >
+                  Read Prompt Guide
+                </Link>
+              </div>
+              <div className="mt-7 grid gap-2 text-sm text-white/52 sm:flex sm:flex-wrap sm:justify-center sm:gap-5">
+                <span>Multi-modal input support</span>
+                <span>4-15 second video generation</span>
+                <span>16:9, 9:16, 1:1 and more</span>
+              </div>
             </div>
+            <div className="mt-9">
+              <PublicGeneratorDemo />
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-semibold text-white sm:text-3xl">
+                Explore stunning video examples created with Seedance 2.0&apos;s multi-modal capabilities.
+              </h2>
+            </div>
+            <Link className="text-sm font-semibold text-[#f7c578] hover:text-[#ffd895]" href="/app">
+              Open studio
+            </Link>
+          </div>
+          <ShowcaseGallery />
+        </section>
+
+        <section className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-10 sm:px-6 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
+          <div>
+            <h2 className="text-2xl font-semibold text-white sm:text-3xl">
+              Key Features of Seedance 2.0
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-white/60">
+              A practical AI video workspace for creators, marketers, educators,
+              editors, filmmakers, and product teams that need controllable
+              generation instead of one-shot random clips.
+            </p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            {features.map((feature) => (
+              <article
+                key={feature.title}
+                className="rounded-2xl border border-white/10 bg-white/[0.045] p-5"
+              >
+                <h3 className="text-base font-semibold text-white">{feature.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-white/58">{feature.copy}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="border-y border-white/10 bg-white/[0.025]">
+          <div className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6">
+            <h2 className="text-2xl font-semibold text-white sm:text-3xl">
+              Endless AI Video Use Cases
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-white/60">
+              Seedance 2.0 helps turn creative references into video output for
+              paid campaigns, organic social, concept development, education,
+              real estate, music, and production planning.
+            </p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              {useCases.map((item) => (
+                <span
+                  key={item}
+                  className="rounded-full border border-white/12 bg-black/18 px-4 py-2 text-sm text-white/68"
+                >
+                  {item}
+                </span>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6">
+          <div className="max-w-3xl">
+            <h2 className="text-2xl font-semibold text-white sm:text-3xl">
+              How to Create AI Videos with Seedance 2.0
+            </h2>
+            <p className="mt-3 text-sm leading-7 text-white/60">
+              A simple workflow for prompt-only generation or optional
+              reference-driven image, video, and audio creation.
+            </p>
+          </div>
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+              {[
+                ["Upload Your Assets", "Add images, videos, or audio files as references for subject identity, camera movement, sound, motion, and scene composition."],
+                ["Describe Your Vision", "Write a prompt that explains the subject, action, environment, style, camera language, and how each reference should be used."],
+                ["Generate and Iterate", "Choose resolution, duration, aspect ratio, and advanced settings, then generate, review, download, or refine the result."],
+              ].map(([title, copy], index) => (
+                <div key={title} className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+                  <div className="flex gap-4">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#f7c578] text-sm font-semibold text-[#080a0f]">
+                      {index + 1}
+                    </span>
+                    <div>
+                      <h3 className="font-semibold text-white">{title}</h3>
+                      <p className="mt-2 text-sm leading-6 text-white/58">{copy}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-7xl px-4 py-12 sm:px-6">
+          <div className="rounded-2xl border border-[#f7c578]/20 bg-[#f7c578]/[0.06] p-6 sm:p-8">
+            <div className="grid gap-6 lg:grid-cols-[1fr_0.8fr] lg:items-center">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#f7c578]">
+                  Seedance Model Credit Pricing
+                </p>
+                <h2 className="mt-3 text-2xl font-semibold text-white sm:text-3xl">
+                  Transparent credits for every generation
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-white/62">
+                  Our studio estimates credit usage before generation based on
+                  model, resolution, duration, aspect ratio, and video reference
+                  input. Monthly plans and one-time credit packs are available.
+                </p>
+              </div>
+              <div className="grid gap-3 text-sm">
+                {[
+                  ["Seedance 2.0 Fast", "480p and 720p creator drafts"],
+                  ["Seedance 2.0", "480p, 720p, and 1080p outputs"],
+                  ["Credit Packs", "Top up anytime without changing plans"],
+                ].map(([label, copy]) => (
+                  <div key={label} className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                    <p className="font-semibold text-white">{label}</p>
+                    <p className="mt-1 text-white/55">{copy}</p>
+                  </div>
+                ))}
+                <Link
+                  className="rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-[#080a0f] transition hover:bg-white/90"
+                  href="/pricing"
+                >
+                  View Pricing
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="mx-auto w-full max-w-4xl px-4 py-12 sm:px-6">
+          <h2 className="text-2xl font-semibold text-white sm:text-3xl">
+            Frequently Asked Questions
+          </h2>
+          <div className="mt-6 grid gap-4">
+            {faqs.map((faq) => (
+              <article key={faq.question} className="rounded-2xl border border-white/10 bg-white/[0.045] p-5">
+                <h3 className="font-semibold text-white">{faq.question}</h3>
+                <p className="mt-2 text-sm leading-6 text-white/58">{faq.answer}</p>
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="px-4 py-12 sm:px-6">
+          <div className="mx-auto max-w-5xl rounded-2xl border border-white/10 bg-white/[0.055] p-6 text-center sm:p-10">
+            <h2 className="text-2xl font-semibold text-white sm:text-3xl">
+              Ready to experience multi-modal AI video creation?
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-sm leading-7 text-white/60">
+              Reference anything, describe the result, generate the clip, and
+              download a professional AI video for your next campaign or story.
+            </p>
             <Link
-              className="rounded-full border border-white/20 bg-white/5 px-6 py-3 text-center text-sm font-semibold text-white/85 transition hover:border-white/40 hover:bg-white/10"
+              className="mt-6 inline-flex rounded-full bg-[#f7c578] px-6 py-3 text-sm font-semibold text-[#080a0f] transition hover:bg-[#ffd895]"
               href="/app"
               prefetch
             >
-              Open workspace
+              Start Creating Now
             </Link>
           </div>
         </section>
       </main>
-    </div>
+    </PageShell>
   );
 }

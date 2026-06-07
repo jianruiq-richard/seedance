@@ -16,8 +16,37 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Seedance 2.0",
-  description: "Seedance 2.0",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://seedance.technology"
+  ),
+  title: {
+    default: "Seedance 2.0 AI Video Generator",
+    template: "%s | Seedance 2",
+  },
+  description:
+    "Create cinematic AI videos with Seedance 2.0. Generate text to video, image to video, video reference edits, audio synced clips, and watermark-free downloads.",
+  applicationName: "Seedance 2",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Seedance 2.0 AI Video Generator",
+    description:
+      "Generate AI videos from text, images, video references, and audio inputs with Seedance 2.0.",
+    url: "/",
+    siteName: "Seedance 2",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Seedance 2.0 AI Video Generator",
+    description:
+      "Create text to video, image to video, and reference-based AI videos with Seedance 2.0.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 const gaMeasurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
