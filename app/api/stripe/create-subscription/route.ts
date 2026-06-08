@@ -23,6 +23,12 @@ export async function POST(request: Request) {
     if (!plan) {
       return NextResponse.json({ error: "Invalid plan" }, { status: 400 });
     }
+    if (!plan.priceId) {
+      return NextResponse.json(
+        { error: "Subscription price is not configured" },
+        { status: 500 }
+      );
+    }
 
     const stripe = createStripeClient();
 
