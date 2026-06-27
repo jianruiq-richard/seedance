@@ -31,6 +31,13 @@ const HISTORY_QUEUED_MAX_POLL_MS = 30 * 60 * 1000;
 type Mode = "text" | "image";
 type MediaKind = "image" | "video" | "audio";
 
+const LEGACY_RELAY_MAX_BYTES = 4 * 1024 * 1024;
+const MAX_REFERENCE_UPLOAD_BYTES_BY_KIND: Record<MediaKind, number> = {
+  image: 20 * 1024 * 1024,
+  video: 200 * 1024 * 1024,
+  audio: 100 * 1024 * 1024,
+};
+
 const mediaKindLabels: Record<MediaKind, string> = {
   image: "Image",
   video: "Video",
@@ -48,6 +55,13 @@ function getMediaKind(file: File): MediaKind | null {
   if (file.type.startsWith("video/")) return "video";
   if (file.type.startsWith("audio/")) return "audio";
   return null;
+}
+
+function formatFileSize(bytes: number) {
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
 }
 
 function formatApiError(data: unknown, fallback: string) {
@@ -81,6 +95,19 @@ function formatApiError(data: unknown, fallback: string) {
 
 function parseApiJson(response: Response) {
   return response.json().catch(() => ({})) as Promise<Record<string, unknown>>;
+}
+
+function formatUploadApiError(data: Record<string, unknown>, fallback: string) {
+  const reason = typeof data.reason === "string" ? data.reason : "";
+  const detail = typeof data.detail === "string" ? data.detail : "";
+  const uploadId = typeof data.uploadId === "string" ? data.uploadId : "";
+  return [
+    detail || (typeof data.error === "string" ? data.error : fallback),
+    reason ? `reason: ${reason}` : "",
+    uploadId ? `uploadId: ${uploadId}` : "",
+  ]
+    .filter(Boolean)
+    .join(" | ");
 }
 
 type GenerationHistoryItem = {
@@ -391,7 +418,10 @@ export default function AppPage() {
     setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
     setUploading((prev) => ({ ...prev, [kind]: true }));
     setErrorMessage(null);
-    try {
+
+    const contentType = file.type || "application/octet-stream";
+
+    const uploadViaRelay = async () => {
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open("POST", "/api/tos/upload", true);
@@ -423,7 +453,9 @@ export default function AppPage() {
             const detail = xhr.responseText?.slice(0, 500) || "";
             reject(
               new Error(
-                `Upload failed (${xhr.status}). ${detail ? `Detail: ${detail}` : ""}`
+                `Upload failed (${xhr.status}). ${
+                  detail ? `Detail: ${detail}` : ""
+                }`
               )
             );
           }
@@ -431,15 +463,126 @@ export default function AppPage() {
         xhr.onerror = () => {
           const detail = xhr.responseText?.slice(0, 500) || "";
           reject(
-            new Error(
-              `Upload failed. ${detail ? `Detail: ${detail}` : ""}`
-            )
+            new Error(`Upload failed. ${detail ? `Detail: ${detail}` : ""}`)
           );
         };
         const formData = new FormData();
         formData.append("file", file);
+        formData.append("uploadId", token);
         xhr.send(formData);
       });
+    };
+
+    const putToSignedUrl = async (uploadUrl: string) => {
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("PUT", uploadUrl, true);
+        xhr.setRequestHeader("content-type", contentType);
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) {
+            const percent = Math.min(
+              95,
+              Math.round((event.loaded / event.total) * 95)
+            );
+            if (isCurrentUpload()) {
+              setUploadProgress((prev) => ({ ...prev, [kind]: percent }));
+            }
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            resolve();
+            return;
+          }
+          reject(
+            new Error(
+              `Direct upload failed (${xhr.status}). ${
+                xhr.responseText ? xhr.responseText.slice(0, 500) : ""
+              }`
+            )
+          );
+        };
+        xhr.onerror = () => {
+          reject(
+            new Error(
+              "Direct upload failed. Check object storage CORS or network connectivity."
+            )
+          );
+        };
+        xhr.send(file);
+      });
+    };
+
+    try {
+      try {
+        const presignResponse = await fetch("/api/tos/upload", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "presign",
+            uploadId: token,
+            fileName: file.name,
+            fileSize: file.size,
+            contentType,
+          }),
+        });
+        const presignData = await parseApiJson(presignResponse);
+        if (!presignResponse.ok) {
+          throw new Error(
+            formatUploadApiError(presignData, "Failed to prepare upload.")
+          );
+        }
+
+        const uploadUrl =
+          typeof presignData.uploadUrl === "string"
+            ? presignData.uploadUrl
+            : "";
+        const key = typeof presignData.key === "string" ? presignData.key : "";
+        if (!uploadUrl || !key) {
+          throw new Error("Failed to prepare upload.");
+        }
+
+        await putToSignedUrl(uploadUrl);
+
+        if (isCurrentUpload()) {
+          setUploadProgress((prev) => ({ ...prev, [kind]: 98 }));
+        }
+
+        const confirmResponse = await fetch("/api/tos/upload", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: "confirm",
+            uploadId: token,
+            key,
+            fileSize: file.size,
+            contentType,
+          }),
+        });
+        const confirmData = await parseApiJson(confirmResponse);
+        if (!confirmResponse.ok) {
+          throw new Error(
+            formatUploadApiError(confirmData, "Failed to confirm upload.")
+          );
+        }
+
+        if (typeof confirmData.url !== "string") {
+          throw new Error("Upload confirmation did not return a URL.");
+        }
+
+        if (isCurrentUpload()) {
+          setReferenceUrls((prev) => ({ ...prev, [kind]: confirmData.url as string }));
+          setUploadProgress((prev) => ({ ...prev, [kind]: 100 }));
+        }
+      } catch (directUploadError) {
+        if (file.size > LEGACY_RELAY_MAX_BYTES) {
+          throw directUploadError;
+        }
+        if (isCurrentUpload()) {
+          setUploadProgress((prev) => ({ ...prev, [kind]: 0 }));
+        }
+        await uploadViaRelay();
+      }
     } catch (error) {
       if (isCurrentUpload()) {
         setErrorMessage(
@@ -457,6 +600,15 @@ export default function AppPage() {
     const kind = getMediaKind(file);
     if (!kind) {
       setErrorMessage("Upload an image, video, or audio file.");
+      return;
+    }
+    const maxUploadBytes = MAX_REFERENCE_UPLOAD_BYTES_BY_KIND[kind];
+    if (file.size > maxUploadBytes) {
+      setErrorMessage(
+        `Reference uploads must be ${formatFileSize(
+          maxUploadBytes
+        )} or smaller. "${file.name}" is ${formatFileSize(file.size)}.`
+      );
       return;
     }
 
