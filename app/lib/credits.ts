@@ -18,10 +18,43 @@ export const seedanceModels = [
 ] as const;
 
 export const DEFAULT_SEEDANCE_MODEL = seedanceModels[0].value;
+export const seedreamModels = [
+  {
+    label: "Seedream 5.0 Pro",
+    value: "doubao-seedream-5-0-pro-260628",
+  },
+  {
+    label: "Seedream 5.0 Lite",
+    value: "doubao-seedream-5-0-lite-260628",
+  },
+] as const;
+
+export const DEFAULT_SEEDREAM_MODEL = seedreamModels[0].value;
+export const imageSizes = [
+  "1K",
+  "2K",
+  "1024x1024",
+  "1424x800",
+  "800x1424",
+  "1152x864",
+  "864x1152",
+  "1248x832",
+  "832x1248",
+  "1568x672",
+  "2048x2048",
+  "2816x1584",
+  "1584x2816",
+  "2368x1776",
+  "1776x2368",
+  "2496x1664",
+  "1664x2496",
+  "3136x1344",
+] as const;
 
 export type ResolutionLabel = (typeof resolutions)[number];
 export type RatioKey = "16:9" | "9:16" | "1:1" | "4:3" | "3:4" | "21:9";
 export type SeedanceModel = (typeof seedanceModels)[number]["value"];
+export type SeedreamModel = (typeof seedreamModels)[number]["value"];
 type PriceModelKey = "doubao-seedance-2.0" | "doubao-seedance-2.0-fast";
 type AspectRatioGroup = "16:9" | "4:3" | "1:1" | "21:9";
 type PriceMode = "no_video" | "with_video";
@@ -394,6 +427,63 @@ export function calculateCreditCost({
       Math.ceil(
         (price.totalCostRmb / USD_CNY_RATE) * PRICE_OVER_COST * CREDITS_PER_USD
       )
+    ),
+  };
+}
+
+function normalizeSeedreamModel(model: string): SeedreamModel | null {
+  if (
+    model === "doubao-seedream-5-0-pro" ||
+    model === "doubao-seedream-5-0-pro-260628"
+  ) {
+    return "doubao-seedream-5-0-pro-260628";
+  }
+
+  if (
+    model === "doubao-seedream-5-0-lite" ||
+    model === "doubao-seedream-5-0-lite-260628"
+  ) {
+    return "doubao-seedream-5-0-lite-260628";
+  }
+
+  return null;
+}
+
+export function calculateImageCreditCost({
+  model = DEFAULT_SEEDREAM_MODEL,
+  size,
+  hasReferenceImage = false,
+}: {
+  model?: string;
+  size: string;
+  hasReferenceImage?: boolean;
+}) {
+  const normalizedModel = normalizeSeedreamModel(model);
+  if (!normalizedModel) {
+    return { error: `Unsupported Seedream model: ${model}` };
+  }
+  if (!imageSizes.includes(size as (typeof imageSizes)[number])) {
+    return { error: `Unsupported image size: ${size}` };
+  }
+
+  const megapixels =
+    size === "1K"
+      ? 1.05
+      : size === "2K"
+        ? 4.2
+        : size
+            .split("x")
+            .map(Number)
+            .reduce((total, value) => total * value, 1) / 1_000_000;
+  const modelBaseCredits =
+    normalizedModel === "doubao-seedream-5-0-pro-260628" ? 18 : 7;
+  const sizeMultiplier = megapixels >= 4 ? 2.2 : megapixels >= 2 ? 1.35 : 1;
+  const referenceMultiplier = hasReferenceImage ? 1.15 : 1;
+
+  return {
+    credits: Math.max(
+      1,
+      Math.ceil(modelBaseCredits * sizeMultiplier * referenceMultiplier)
     ),
   };
 }

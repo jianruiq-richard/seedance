@@ -4,11 +4,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { UserButton, useClerk, useUser } from "@clerk/nextjs";
 import {
+  calculateImageCreditCost,
   calculateCreditCost,
   DEFAULT_SEEDANCE_MODEL,
+  DEFAULT_SEEDREAM_MODEL,
   DEFAULT_NEW_USER_CREDITS,
+  imageSizes,
   resolutions,
   seedanceModels,
+  seedreamModels,
   type RatioKey,
 } from "../lib/credits";
 
@@ -29,6 +33,7 @@ const HISTORY_QUEUED_POLL_INTERVAL_MS = 15000;
 const HISTORY_QUEUED_MAX_POLL_MS = 30 * 60 * 1000;
 
 type Mode = "text" | "image";
+type GenerationProduct = "video" | "image";
 type MediaKind = "image" | "video" | "audio";
 
 const LEGACY_RELAY_MAX_BYTES = 4 * 1024 * 1024;
@@ -114,11 +119,12 @@ type GenerationHistoryItem = {
   id: string;
   upstreamTaskId: string | null;
   mode: Mode;
+  outputType: GenerationProduct;
   prompt: string;
   imageUrl: string | null;
   videoUrl: string | null;
   downloadUrl: string | null;
-  status: "queued" | "succeeded" | "failed";
+  status: "queued" | "processing" | "succeeded" | "failed";
   creditsCharged: number;
   ratio: string | null;
   resolution: string | null;
@@ -138,11 +144,25 @@ const ratioSizeMap: Record<RatioKey, { width: number; height: number }> = {
   "21:9": { width: 1260, height: 540 },
 };
 
+function imageSizeToAspect(size: string) {
+  if (size === "2K" || size === "1K") {
+    return { width: 1, height: 1 };
+  }
+  const [width, height] = size.split("x").map(Number);
+  if (!width || !height) {
+    return { width: 1, height: 1 };
+  }
+  return { width, height };
+}
+
 export default function AppPage() {
   const { user } = useUser();
   const { signOut } = useClerk();
   const isSignedIn = Boolean(user);
+  const [generationProduct, setGenerationProduct] =
+    useState<GenerationProduct>("video");
   const [model, setModel] = useState<string>(DEFAULT_SEEDANCE_MODEL);
+  const [imageModel, setImageModel] = useState<string>(DEFAULT_SEEDREAM_MODEL);
   const [prompt, setPrompt] = useState(
     "Neon city streets, slow motion, cinematic glow"
   );
@@ -153,6 +173,15 @@ export default function AppPage() {
   );
   const [seed, setSeed] = useState<number>(-1);
   const [watermark, setWatermark] = useState<boolean>(false);
+  const [imageSize, setImageSize] =
+    useState<(typeof imageSizes)[number]>("1K");
+  const [imageOutputFormat, setImageOutputFormat] =
+    useState<"jpeg" | "png">("jpeg");
+  const [sequentialImageGeneration, setSequentialImageGeneration] =
+    useState<"disabled" | "auto">("disabled");
+  const [maxImages, setMaxImages] = useState<number>(4);
+  const [webSearch, setWebSearch] = useState<boolean>(false);
+  const [optimizePrompt, setOptimizePrompt] = useState<boolean>(false);
   const [generateAudio, setGenerateAudio] = useState<boolean>(true);
   const [executionExpiresAfter, setExecutionExpiresAfter] =
     useState<number>(172800);
@@ -182,6 +211,7 @@ export default function AppPage() {
     "idle"
   );
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [generatedImageUrl, setGeneratedImageUrl] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [seedKey, setSeedKey] = useState<number>(Date.now());
@@ -227,16 +257,24 @@ export default function AppPage() {
   );
 
   const aspectSize = useMemo(() => {
+    if (generationProduct === "image") {
+      return imageSizeToAspect(imageSize);
+    }
     const normalized = ratio as RatioKey;
     return ratioSizeMap[normalized] ?? ratioSizeMap["16:9"];
-  }, [ratio]);
+  }, [generationProduct, imageSize, ratio]);
 
   const generationStage = useMemo(() => {
+    if (generationProduct === "image") {
+      if (renderProgress < 40) return "Preparing image";
+      if (renderProgress < 76) return "Composing pixels";
+      return "Finalizing image";
+    }
     if (renderProgress < 28) return "Preparing scene";
     if (renderProgress < 58) return "Composing motion";
     if (renderProgress < 82) return "Rendering frames";
     return "Finalizing video";
-  }, [renderProgress]);
+  }, [generationProduct, renderProgress]);
 
   const hasActiveUpload = useMemo(
     () => Object.values(uploading).some(Boolean),
@@ -261,14 +299,23 @@ export default function AppPage() {
     setPricingLoading(true);
     setPricingError(null);
     const handle = setTimeout(() => {
-      const result = calculateCreditCost({
-        resolution,
-        ratio,
-        duration,
-        generateAudio,
-        model,
-        inputVideoDuration: referenceUrls.video ? referenceDurations.video : 0,
-      });
+      const result =
+        generationProduct === "image"
+          ? calculateImageCreditCost({
+              model: imageModel,
+              size: imageSize,
+              hasReferenceImage: Boolean(referenceUrls.image),
+            })
+          : calculateCreditCost({
+              resolution,
+              ratio,
+              duration,
+              generateAudio,
+              model,
+              inputVideoDuration: referenceUrls.video
+                ? referenceDurations.video
+                : 0,
+            });
       if ("error" in result) {
         setPricingError(result.error);
         setPricingCredits(0);
@@ -285,6 +332,10 @@ export default function AppPage() {
     duration,
     generateAudio,
     model,
+    generationProduct,
+    imageModel,
+    imageSize,
+    referenceUrls.image,
     referenceUrls.video,
     referenceDurations.video,
   ]);
@@ -367,7 +418,7 @@ export default function AppPage() {
 
   useEffect(() => {
     const hasQueuedHistory = historyItems.some(
-      (item) => item.status === "queued"
+      (item) => item.status === "queued" || item.status === "processing"
     );
 
     if (!isSignedIn || !hasQueuedHistory) {
@@ -602,6 +653,10 @@ export default function AppPage() {
       setErrorMessage("Upload an image, video, or audio file.");
       return;
     }
+    if (generationProduct === "image" && kind !== "image") {
+      setErrorMessage("Image generation only accepts image references.");
+      return;
+    }
     const maxUploadBytes = MAX_REFERENCE_UPLOAD_BYTES_BY_KIND[kind];
     if (file.size > maxUploadBytes) {
       setErrorMessage(
@@ -648,7 +703,7 @@ export default function AppPage() {
     const isUploading = Object.values(uploading).some(Boolean);
 
     if (!isSignedIn) {
-      setErrorMessage("Please sign in to generate videos.");
+      setErrorMessage("Please sign in to generate.");
       return;
     }
     if (pricingLoading) {
@@ -667,15 +722,27 @@ export default function AppPage() {
       setErrorMessage("Wait for uploads to finish before generating.");
       return;
     }
-    if (!trimmedPrompt && !hasImage && !hasVideo) {
+    if (generationProduct === "image" && !trimmedPrompt) {
+      setErrorMessage("Add a prompt before generating an image.");
+      return;
+    }
+    if (generationProduct === "image" && imageModel.includes("-pro-") && sequentialImageGeneration !== "disabled") {
+      setErrorMessage("Seedream 5.0 Pro only supports single image generation.");
+      return;
+    }
+    if (generationProduct === "image" && imageModel.includes("-pro-") && webSearch) {
+      setErrorMessage("Seedream 5.0 Pro does not support web search.");
+      return;
+    }
+    if (generationProduct === "video" && !trimmedPrompt && !hasImage && !hasVideo) {
       setErrorMessage("Add a prompt, image, or video reference before generating.");
       return;
     }
-    if (hasAudio && !hasImage && !hasVideo) {
+    if (generationProduct === "video" && hasAudio && !hasImage && !hasVideo) {
       setErrorMessage("Audio must be combined with an image or video reference.");
       return;
     }
-    if (hasVideo && referenceDurations.video <= 0) {
+    if (generationProduct === "video" && hasVideo && referenceDurations.video <= 0) {
       setErrorMessage("Wait for the input video duration to load.");
       return;
     }
@@ -691,12 +758,104 @@ export default function AppPage() {
       if (prev) URL.revokeObjectURL(prev);
       return null;
     });
+    setGeneratedImageUrl(null);
     setDownloadUrl((prev) => {
       if (prev) URL.revokeObjectURL(prev);
       return null;
     });
 
     try {
+      if (generationProduct === "image") {
+        const response = await fetch("/api/seedream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: imageModel,
+            prompt: trimmedPrompt,
+            imageUrl: hasImage ? referenceUrls.image : null,
+            size: imageSize,
+            seed,
+            watermark,
+            output_format: imageOutputFormat,
+            response_format: "url",
+            sequential_image_generation: sequentialImageGeneration,
+            max_images: maxImages,
+            web_search: webSearch,
+            optimize_prompt_mode: optimizePrompt ? "standard" : undefined,
+          }),
+        });
+        const data = await parseApiJson(response);
+        if (!isCurrentGeneration()) {
+          return;
+        }
+        if (!response.ok) {
+          throw new Error(formatApiError(data, "Image generation failed."));
+        }
+        if (typeof data?.creditsRemaining === "number") {
+          setCredits(data.creditsRemaining);
+        }
+        const jobId = typeof data?.jobId === "string" ? data.jobId : null;
+        activeGenerationJobIdRef.current = jobId;
+        void loadGenerationHistory({ reset: true });
+
+        let outputUrl =
+          typeof data?.imageUrl === "string" ? data.imageUrl : null;
+        let taskStatus =
+          typeof data?.status === "string" ? data.status : "queued";
+
+        if (!outputUrl && jobId) {
+          for (let i = 0; i < GENERATION_MAX_POLLS; i += 1) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, GENERATION_POLL_INTERVAL_MS)
+            );
+            if (!isCurrentGeneration()) {
+              return;
+            }
+            const pollResponse = await fetch(`/api/seedream?jobId=${jobId}`);
+            const pollData = await parseApiJson(pollResponse);
+            if (!isCurrentGeneration()) {
+              return;
+            }
+            if (!pollResponse.ok) {
+              continue;
+            }
+            taskStatus =
+              typeof pollData?.status === "string"
+                ? pollData.status
+                : taskStatus;
+            outputUrl =
+              typeof pollData?.imageUrl === "string"
+                ? pollData.imageUrl
+                : null;
+
+            if (taskStatus === "succeeded" && outputUrl) {
+              break;
+            }
+            if (taskStatus === "failed") {
+              throw new Error(
+                formatApiError(pollData, "Image generation failed.")
+              );
+            }
+          }
+        }
+
+        if (!outputUrl) {
+          throw new Error(
+            "Image generation is still processing. Check the generation log for updates."
+          );
+        }
+        setRenderProgress(100);
+        setGeneratedImageUrl(outputUrl);
+        setDownloadUrl(outputUrl);
+        setStatus("ready");
+        setSeedKey(Date.now());
+        activeGenerationRunRef.current = null;
+        void loadGenerationHistory({ reset: true });
+        return;
+      }
+
       const response = await fetch("/api/seedance", {
         method: "POST",
         headers: {
@@ -827,7 +986,7 @@ export default function AppPage() {
           <div className="flex min-w-0 items-center gap-3">
             <span className="inline-flex h-2 w-2 rounded-full bg-[#f7c578]" />
             <span className="truncate text-base font-semibold sm:text-lg">
-              Seedance Studio
+              Creative Studio
             </span>
           </div>
           <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 text-sm text-white/70 sm:flex-none sm:gap-4">
@@ -886,7 +1045,7 @@ export default function AppPage() {
               </h3>
             </div>
             <p className="mt-2 text-sm text-green-300/80">
-              Your credits have been updated. You can now start creating amazing videos!
+              Your credits have been updated. You can now start creating.
             </p>
           </div>
         </div>
@@ -895,6 +1054,26 @@ export default function AppPage() {
       <div className="mx-auto grid w-full max-w-6xl gap-5 px-4 py-5 sm:gap-8 sm:px-6 sm:py-10 lg:grid-cols-[360px_minmax(0,1fr)]">
         <section className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur sm:rounded-3xl sm:p-6">
           <div className="space-y-4 sm:mt-2">
+            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/20 p-1">
+              {[
+                ["video", "Video Generation"],
+                ["image", "Image Generation"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                    generationProduct === value
+                      ? "bg-white text-[#0a0b10]"
+                      : "text-white/65 hover:text-white"
+                  }`}
+                  type="button"
+                  onClick={() => setGenerationProduct(value as GenerationProduct)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
             <label className="text-xs uppercase tracking-[0.2em] text-white/50">
               Prompt
             </label>
@@ -928,11 +1107,15 @@ export default function AppPage() {
                   addReferenceFiles(event.dataTransfer.files);
                 }}
               >
-                <input
-                  className="hidden"
-                  type="file"
-                  accept="image/*,video/*,audio/*"
-                  multiple
+	                <input
+	                  className="hidden"
+	                  type="file"
+	                  accept={
+                      generationProduct === "image"
+                        ? "image/*"
+                        : "image/*,video/*,audio/*"
+                    }
+	                  multiple
                   onChange={(event) => {
                     if (event.target.files) {
                       addReferenceFiles(event.target.files);
@@ -940,11 +1123,18 @@ export default function AppPage() {
                     event.target.value = "";
                   }}
                 />
-                <span>Drag & drop or click to upload</span>
-                <span className="text-white/40">Image, video, or audio</span>
-              </label>
+	                <span>Drag & drop or click to upload</span>
+	                <span className="text-white/40">
+                    {generationProduct === "image"
+                      ? "Image references"
+                      : "Image, video, or audio"}
+                  </span>
+	              </label>
 
-              {(["image", "video", "audio"] as MediaKind[]).map((kind) => {
+	              {(generationProduct === "image"
+                  ? (["image"] as MediaKind[])
+                  : (["image", "video", "audio"] as MediaKind[])
+                ).map((kind) => {
                 const file = referenceFiles[kind];
                 const preview = referencePreviews[kind];
                 const progress = uploadProgress[kind];
@@ -1040,6 +1230,7 @@ export default function AppPage() {
               })}
             </div>
 
+            {generationProduct === "video" ? (
             <div className="grid gap-4">
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
@@ -1172,6 +1363,138 @@ export default function AppPage() {
                 />
               </div>
             </div>
+            ) : (
+            <div className="grid gap-4">
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Model
+                </label>
+                <select
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  value={imageModel}
+                  onChange={(event) => {
+                    const nextModel = event.target.value;
+                    setImageModel(nextModel);
+                    if (nextModel.includes("-pro-")) {
+                      setSequentialImageGeneration("disabled");
+                      setWebSearch(false);
+                    }
+                  }}
+                >
+                  {seedreamModels.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Size
+                </label>
+                <select
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  value={imageSize}
+                  onChange={(event) =>
+                    setImageSize(event.target.value as typeof imageSize)
+                  }
+                >
+                  {imageSizes.map((item) => (
+                    <option key={item} value={item}>
+                      {item}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Output format
+                </label>
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  {(["jpeg", "png"] as const).map((item) => (
+                    <button
+                      key={item}
+                      className={`rounded-full border px-3 py-2 text-xs uppercase transition ${
+                        imageOutputFormat === item
+                          ? "border-white bg-white text-[#0a0b10]"
+                          : "border-white/20 text-white/70"
+                      }`}
+                      onClick={() => setImageOutputFormat(item)}
+                      type="button"
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  Seed (-1 for random)
+                </label>
+                <input
+                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  type="number"
+                  value={seed}
+                  onChange={(event) => setSeed(Number(event.target.value))}
+                />
+              </div>
+              <div className="grid gap-3 rounded-2xl border border-white/10 bg-black/20 p-4 text-xs text-white/70">
+                <label className="flex items-center justify-between gap-2">
+                  Watermark
+                  <input
+                    type="checkbox"
+                    checked={watermark}
+                    onChange={(event) => setWatermark(event.target.checked)}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  Optimize prompt
+                  <input
+                    type="checkbox"
+                    checked={optimizePrompt}
+                    onChange={(event) => setOptimizePrompt(event.target.checked)}
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  Group images
+                  <input
+                    type="checkbox"
+                    checked={sequentialImageGeneration === "auto"}
+                    disabled={imageModel.includes("-pro-")}
+                    onChange={(event) =>
+                      setSequentialImageGeneration(
+                        event.target.checked ? "auto" : "disabled"
+                      )
+                    }
+                  />
+                </label>
+                <label className="flex items-center justify-between gap-2">
+                  Web search
+                  <input
+                    type="checkbox"
+                    checked={webSearch}
+                    disabled={imageModel.includes("-pro-")}
+                    onChange={(event) => setWebSearch(event.target.checked)}
+                  />
+                </label>
+              </div>
+              {sequentialImageGeneration === "auto" && !imageModel.includes("-pro-") && (
+                <div>
+                  <label className="text-xs uppercase tracking-[0.2em] text-white/50">
+                    Max images
+                  </label>
+                  <input
+                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                    type="number"
+                    min={1}
+                    max={15}
+                    value={maxImages}
+                    onChange={(event) => setMaxImages(Number(event.target.value))}
+                  />
+                </div>
+              )}
+            </div>
+            )}
 
             <button
               className="mt-2 w-full rounded-2xl bg-[#f7c578] px-4 py-3 text-sm font-semibold text-[#0a0b10] transition hover:bg-[#f7c578]/90 disabled:cursor-not-allowed disabled:opacity-60"
@@ -1229,7 +1552,15 @@ export default function AppPage() {
               className="relative mt-4 flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/20 sm:min-h-[320px]"
               style={{ aspectRatio: `${aspectSize.width}/${aspectSize.height}` }}
             >
-              {videoUrl ? (
+              {generatedImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={seedKey}
+                  className="max-h-[70vh] w-full rounded-2xl object-contain sm:max-h-[520px]"
+                  src={generatedImageUrl}
+                  alt="Generated image"
+                />
+              ) : videoUrl ? (
                 <video
                   key={seedKey}
                   className="max-h-[70vh] w-full rounded-2xl bg-black/40 sm:max-h-[360px]"
@@ -1266,7 +1597,9 @@ export default function AppPage() {
                       {generationStage}
                     </div>
                     <div className="mt-2 max-w-sm text-xs leading-5 text-white/45">
-                      Keep this page open while Seedance prepares your video.
+                      {generationProduct === "image"
+                        ? "You can leave this page after the job is queued. The result will appear in history."
+                        : "You can leave this page after the job is queued. The result will appear in history."}
                     </div>
                     <div className="mt-5 h-1.5 w-full max-w-xs overflow-hidden rounded-full bg-white/10">
                       <div
@@ -1287,9 +1620,13 @@ export default function AppPage() {
                 <a
                   className="inline-flex min-w-[132px] items-center justify-center rounded-full border border-white/20 bg-white px-4 py-2 text-center text-xs font-semibold !text-[#0a0b10] shadow-sm transition hover:bg-white/90"
                   href={downloadUrl}
-                  download={`seedance-${ratio}.mp4`}
+                  download={
+                    generationProduct === "image"
+                      ? `seedream-${imageSize}.${imageOutputFormat === "png" ? "png" : "jpg"}`
+                      : `seedance-${ratio}.mp4`
+                  }
                 >
-                  Download video
+                  {generationProduct === "image" ? "Download image" : "Download video"}
                 </a>
               </div>
             )}
@@ -1311,6 +1648,8 @@ export default function AppPage() {
               <div className="grid gap-3">
                 {historyItems.map((item) => {
                   const playableUrl = item.videoUrl ?? item.downloadUrl;
+                  const imageResultUrl =
+                    item.outputType === "image" ? item.imageUrl : null;
                   const itemRatio = item.ratio ?? "16:9";
                   return (
                     <div
@@ -1320,9 +1659,13 @@ export default function AppPage() {
                       <div className="flex flex-wrap items-center justify-between gap-3">
                         <div>
                           <span className="text-white">
-                            {item.mode === "text"
-                              ? "Text to Video"
-                              : "Image to Video"}
+                            {item.outputType === "image"
+                              ? item.mode === "text"
+                                ? "Text to Image"
+                                : "Image to Image"
+                              : item.mode === "text"
+                                ? "Text to Video"
+                                : "Image to Video"}
                           </span>
                           <span className="ml-2 rounded-full border border-white/15 px-2 py-1 text-[11px] text-white/45">
                             {item.status}
@@ -1332,7 +1675,14 @@ export default function AppPage() {
                           {new Date(item.createdAt).toLocaleString()}
                         </span>
                       </div>
-                      {playableUrl && (
+                      {imageResultUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          className="mt-3 max-h-[360px] w-full rounded-2xl bg-black/40 object-contain"
+                          src={imageResultUrl}
+                          alt="Generated image"
+                        />
+                      ) : playableUrl && (
                         <video
                           className="mt-3 max-h-[280px] w-full rounded-2xl bg-black/40"
                           src={playableUrl}
@@ -1347,14 +1697,24 @@ export default function AppPage() {
                         <div className="flex flex-wrap gap-3">
                           <span>{item.resolution ?? "—"}</span>
                           <span>{itemRatio}</span>
-                          <span>{item.duration ?? "—"}s</span>
+                          {item.outputType === "video" && (
+                            <span>{item.duration ?? "—"}s</span>
+                          )}
                           <span>{item.creditsCharged} credits</span>
                         </div>
-                        {item.downloadUrl && (
+                        {(item.outputType === "image" ? imageResultUrl : item.downloadUrl) && (
                           <a
                             className="inline-flex min-w-[112px] items-center justify-center rounded-full border border-white/20 bg-white px-4 py-2 text-xs font-semibold !text-[#0a0b10] shadow-sm transition hover:bg-white/90"
-                            href={item.downloadUrl}
-                            download={`seedance-${item.mode}-${itemRatio}.mp4`}
+                            href={
+                              item.outputType === "image"
+                                ? imageResultUrl ?? undefined
+                                : item.downloadUrl ?? undefined
+                            }
+                            download={
+                              item.outputType === "image"
+                                ? `seedream-${item.mode}-${item.resolution ?? "image"}.jpg`
+                                : `seedance-${item.mode}-${itemRatio}.mp4`
+                            }
                           >
                             Download
                           </a>

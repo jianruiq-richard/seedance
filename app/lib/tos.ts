@@ -29,21 +29,23 @@ function createClient() {
     accessKeySecret: secretAccessKey,
     region,
     endpoint: normalizeTosEndpoint(endpoint),
-    secure: true,
+    secure: false,
     connectionTimeout: 30000,
     requestTimeout: 120000,
     maxRetryCount: 3,
   });
 }
 
-export async function archiveVideoToTos({
+export async function archiveMediaToTos({
   sourceUrl,
   userId,
   jobId,
+  mediaType = "video",
 }: {
   sourceUrl: string;
   userId: string;
   jobId: string;
+  mediaType?: "video" | "image";
 }) {
   if (!isConfigured()) {
     return sourceUrl;
@@ -51,14 +53,25 @@ export async function archiveVideoToTos({
 
   const response = await fetch(sourceUrl);
   if (!response.ok) {
-    throw new Error(`Failed to download video for archive: ${response.status}`);
+    throw new Error(`Failed to download ${mediaType} for archive: ${response.status}`);
   }
 
-  const contentType = response.headers.get("content-type") || "video/mp4";
+  const fallbackContentType = mediaType === "image" ? "image/png" : "video/mp4";
+  const contentType = response.headers.get("content-type") || fallbackContentType;
   const buffer = Buffer.from(await response.arrayBuffer());
+  const extension =
+    contentType.includes("jpeg") || contentType.includes("jpg")
+      ? "jpg"
+      : contentType.includes("webp")
+        ? "webp"
+        : contentType.includes("png")
+          ? "png"
+          : mediaType === "image"
+            ? "png"
+            : "mp4";
   const key = `users/${userId}/generations/${jobId}-${crypto
     .randomBytes(4)
-    .toString("hex")}.mp4`;
+    .toString("hex")}.${extension}`;
 
   const client = createClient();
   try {
@@ -77,4 +90,16 @@ export async function archiveVideoToTos({
   }
 
   return `https://${bucket}.${normalizeTosEndpoint(endpoint!)}/${key}`;
+}
+
+export async function archiveVideoToTos({
+  sourceUrl,
+  userId,
+  jobId,
+}: {
+  sourceUrl: string;
+  userId: string;
+  jobId: string;
+}) {
+  return archiveMediaToTos({ sourceUrl, userId, jobId, mediaType: "video" });
 }

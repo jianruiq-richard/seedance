@@ -1,13 +1,16 @@
 import { Pool, type QueryResultRow } from "pg";
 
-type GenerationStatus = "queued" | "succeeded" | "failed";
+type GenerationStatus = "queued" | "processing" | "succeeded" | "failed";
 type GenerationMode = "text" | "image";
+type GenerationOutputType = "video" | "image";
 
 export type GenerationJob = {
   id: string;
   clerkUserId: string;
   upstreamTaskId: string | null;
   mode: GenerationMode;
+  outputType: GenerationOutputType;
+  requestPayload: Record<string, unknown> | null;
   prompt: string;
   imageUrl: string | null;
   videoUrl: string | null;
@@ -27,6 +30,8 @@ export type CreateGenerationJobInput = {
   clerkUserId: string;
   upstreamTaskId: string | null;
   mode: GenerationMode;
+  outputType?: GenerationOutputType;
+  requestPayload?: Record<string, unknown> | null;
   prompt: string;
   imageUrl: string | null;
   creditsCharged: number;
@@ -67,6 +72,8 @@ function mapGenerationJob(row: QueryResultRow): GenerationJob {
     clerkUserId: row.clerk_user_id,
     upstreamTaskId: row.upstream_task_id,
     mode: row.mode,
+    outputType: row.output_type ?? "video",
+    requestPayload: row.request_payload ?? null,
     prompt: row.prompt,
     imageUrl: row.image_url,
     videoUrl: row.video_url,
@@ -89,6 +96,8 @@ export async function createGenerationJob(input: CreateGenerationJobInput) {
       clerk_user_id,
       upstream_task_id,
       mode,
+      output_type,
+      request_payload,
       prompt,
       image_url,
       credits_charged,
@@ -99,13 +108,15 @@ export async function createGenerationJob(input: CreateGenerationJobInput) {
       status,
       error_message,
       completed_at
-    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12,
-      case when $11 = 'failed' then now() else null end)
+    ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+      case when $13 = 'failed' then now() else null end)
     returning *`,
     [
       input.clerkUserId,
       input.upstreamTaskId,
       input.mode,
+      input.outputType ?? "video",
+      input.requestPayload ?? null,
       input.prompt,
       input.imageUrl,
       input.creditsCharged,
@@ -137,12 +148,14 @@ export async function updateGenerationJobResult({
   clerkUserId,
   status,
   videoUrl,
+  imageUrl,
   errorMessage,
 }: {
   id: string;
   clerkUserId: string;
   status: GenerationStatus;
   videoUrl?: string | null;
+  imageUrl?: string | null;
   errorMessage?: string | null;
 }) {
   const result = await getPool().query(
@@ -150,11 +163,19 @@ export async function updateGenerationJobResult({
      set status = $3,
        video_url = coalesce($4, video_url),
        download_url = coalesce($4, download_url),
-       error_message = coalesce($5, error_message),
+       image_url = coalesce($5, image_url),
+       error_message = coalesce($6, error_message),
        completed_at = case when $3 in ('succeeded', 'failed') then now() else completed_at end
      where id = $1 and clerk_user_id = $2
      returning *`,
-    [id, clerkUserId, status, videoUrl ?? null, errorMessage ?? null]
+    [
+      id,
+      clerkUserId,
+      status,
+      videoUrl ?? null,
+      imageUrl ?? null,
+      errorMessage ?? null,
+    ]
   );
 
   return result.rows[0] ? mapGenerationJob(result.rows[0]) : null;
@@ -172,6 +193,7 @@ export async function listStaleQueuedGenerationJobs({
   const result = await getPool().query(
     `select * from generation_jobs
      where status = 'queued'
+       and output_type = 'video'
        and upstream_task_id is not null
        and created_at < now() - ($1::int * interval '1 minute')
      order by created_at asc, id asc

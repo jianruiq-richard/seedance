@@ -27,7 +27,12 @@ export async function GET(request: Request) {
     cursor,
   });
   const queuedJobs = result.items
-    .filter((item) => item.status === "queued" && item.upstreamTaskId)
+    .filter(
+      (item) =>
+        item.outputType === "video" &&
+        item.status === "queued" &&
+        item.upstreamTaskId
+    )
     .slice(0, MAX_INLINE_QUEUED_SYNCS);
 
   if (queuedJobs.length === 0) {

@@ -12,6 +12,15 @@ type CreditUsageEntry = {
     inputVideoDuration?: number | null;
     generateAudio?: boolean | null;
     model?: string | null;
+    size?: string | null;
+    hasReferenceImage?: boolean | null;
+    seed?: number | null;
+    watermark?: boolean | null;
+    output_format?: string | null;
+    sequential_image_generation?: string | null;
+    max_images?: number | null;
+    web_search?: boolean | null;
+    optimize_prompt_mode?: string | null;
   };
 };
 
@@ -84,6 +93,23 @@ function normalizeCreditUsageEntry(value: unknown): CreditUsageEntry | null {
               ? params.generateAudio
               : null,
           model: trimText(params.model, 80) ?? null,
+          size: trimText(params.size, 16) ?? null,
+          hasReferenceImage:
+            typeof params.hasReferenceImage === "boolean"
+              ? params.hasReferenceImage
+              : null,
+          seed: typeof params.seed === "number" ? params.seed : null,
+          watermark:
+            typeof params.watermark === "boolean" ? params.watermark : null,
+          output_format: trimText(params.output_format, 16) ?? null,
+          sequential_image_generation:
+            trimText(params.sequential_image_generation, 16) ?? null,
+          max_images:
+            typeof params.max_images === "number" ? params.max_images : null,
+          web_search:
+            typeof params.web_search === "boolean" ? params.web_search : null,
+          optimize_prompt_mode:
+            trimText(params.optimize_prompt_mode, 16) ?? null,
         }
       : undefined,
   };

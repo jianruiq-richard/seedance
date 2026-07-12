@@ -30,6 +30,10 @@ function getPublicUrl(key: string) {
   return `https://${bucket}.${normalizeTosEndpoint(endpoint!)}/${key}`;
 }
 
+function normalizePresignedUrl(value: string) {
+  return value.replace(/^http:\/\//, "https://");
+}
+
 function getMediaKind(contentType: string): MediaKind | null {
   if (contentType.startsWith("image/")) return "image";
   if (contentType.startsWith("video/")) return "video";
@@ -140,7 +144,7 @@ function createClient() {
     accessKeySecret: secretAccessKey,
     region,
     endpoint: normalizeTosEndpoint(endpoint),
-    secure: true,
+    secure: false,
     connectionTimeout: 30000,
     requestTimeout: 120000,
     maxRetryCount: 3,
@@ -274,12 +278,12 @@ async function handlePresignUpload({
     fileName: String(body.fileName),
   });
   const client = createClient();
-  const uploadUrl = client.getPreSignedUrl({
+  const uploadUrl = normalizePresignedUrl(client.getPreSignedUrl({
     bucket,
     key,
     method: "PUT",
     expires: DIRECT_UPLOAD_EXPIRES_SECONDS,
-  });
+  }));
   const publicUrl = getPublicUrl(key);
 
   logUploadEvent("TOS direct upload presigned", {
