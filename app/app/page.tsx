@@ -707,7 +707,7 @@ export default function AppPage() {
     const isUploading = Object.values(uploading).some(Boolean);
 
     if (!isSignedIn) {
-      setErrorMessage("Please sign in to generate.");
+      window.location.href = "/sign-in?redirect_url=/app";
       return;
     }
     if (pricingLoading) {
