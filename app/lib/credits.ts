@@ -4,6 +4,11 @@ const DEFAULT_FPS = 24;
 const PRICE_OVER_COST = 2;
 const CREDITS_PER_USD = 1000;
 const USD_CNY_RATE = 7.2;
+const SEEDREAM_INPUT_IMAGE_COST_RMB = 0.02;
+const SEEDREAM_LITE_OUTPUT_COST_RMB = 0.22;
+const SEEDREAM_PRO_SMALL_OUTPUT_COST_RMB = 0.3;
+const SEEDREAM_PRO_LARGE_OUTPUT_COST_RMB = 0.6;
+const SEEDREAM_PRO_LARGE_OUTPUT_MIN_PIXELS = 1536 * 1536;
 
 export const resolutions = ["480p", "720p", "1080p"] as const;
 export const seedanceModels = [
@@ -424,11 +429,13 @@ export function calculateCreditCost({
   return {
     credits: Math.max(
       1,
-      Math.ceil(
-        (price.totalCostRmb / USD_CNY_RATE) * PRICE_OVER_COST * CREDITS_PER_USD
-      )
+      Math.ceil(rmbCostToCredits(price.totalCostRmb))
     ),
   };
+}
+
+function rmbCostToCredits(totalCostRmb: number) {
+  return (totalCostRmb / USD_CNY_RATE) * PRICE_OVER_COST * CREDITS_PER_USD;
 }
 
 function normalizeSeedreamModel(model: string): SeedreamModel | null {
@@ -453,10 +460,16 @@ export function calculateImageCreditCost({
   model = DEFAULT_SEEDREAM_MODEL,
   size,
   hasReferenceImage = false,
+  referenceImageCount,
+  sequentialImageGeneration = "disabled",
+  maxImages,
 }: {
   model?: string;
   size: string;
   hasReferenceImage?: boolean;
+  referenceImageCount?: number;
+  sequentialImageGeneration?: "auto" | "disabled";
+  maxImages?: number;
 }) {
   const normalizedModel = normalizeSeedreamModel(model);
   if (!normalizedModel) {
@@ -465,25 +478,50 @@ export function calculateImageCreditCost({
   if (!imageSizes.includes(size as (typeof imageSizes)[number])) {
     return { error: `Unsupported image size: ${size}` };
   }
+  if (
+    referenceImageCount !== undefined &&
+    (!Number.isInteger(referenceImageCount) || referenceImageCount < 0)
+  ) {
+    return { error: "Reference image count must be a non-negative integer." };
+  }
+  if (
+    maxImages !== undefined &&
+    (!Number.isInteger(maxImages) || maxImages < 1 || maxImages > 15)
+  ) {
+    return { error: "max_images must be an integer from 1 to 15." };
+  }
 
-  const megapixels =
+  const normalizedReferenceCount =
+    referenceImageCount ?? (hasReferenceImage ? 1 : 0);
+  const isLite = normalizedModel === "doubao-seedream-5-0-lite-260628";
+  const outputImageCount =
+    isLite && sequentialImageGeneration === "auto"
+      ? (maxImages ?? Math.max(1, 15 - normalizedReferenceCount))
+      : 1;
+  const outputPixels =
     size === "1K"
-      ? 1.05
+      ? 1024 * 1024
       : size === "2K"
-        ? 4.2
+        ? 2048 * 2048
         : size
             .split("x")
             .map(Number)
-            .reduce((total, value) => total * value, 1) / 1_000_000;
-  const modelBaseCredits =
-    normalizedModel === "doubao-seedream-5-0-pro-260628" ? 18 : 7;
-  const sizeMultiplier = megapixels >= 4 ? 2.2 : megapixels >= 2 ? 1.35 : 1;
-  const referenceMultiplier = hasReferenceImage ? 1.15 : 1;
+            .reduce((total, value) => total * value, 1);
+
+  const outputCostRmb = isLite
+    ? SEEDREAM_LITE_OUTPUT_COST_RMB
+    : outputPixels > SEEDREAM_PRO_LARGE_OUTPUT_MIN_PIXELS
+      ? SEEDREAM_PRO_LARGE_OUTPUT_COST_RMB
+      : SEEDREAM_PRO_SMALL_OUTPUT_COST_RMB;
+  const inputCostRmb = isLite
+    ? 0
+    : normalizedReferenceCount * SEEDREAM_INPUT_IMAGE_COST_RMB;
+  const totalCostRmb = inputCostRmb + outputImageCount * outputCostRmb;
 
   return {
     credits: Math.max(
       1,
-      Math.ceil(modelBaseCredits * sizeMultiplier * referenceMultiplier)
+      Math.ceil(rmbCostToCredits(totalCostRmb))
     ),
   };
 }

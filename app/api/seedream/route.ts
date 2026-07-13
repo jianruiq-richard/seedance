@@ -349,7 +349,9 @@ export async function POST(request: Request) {
   const creditCost = calculateImageCreditCost({
     model,
     size,
-    hasReferenceImage: Boolean(imageUrl),
+    referenceImageCount: imageUrls.length,
+    sequentialImageGeneration,
+    maxImages: body.max_images,
   });
   if ("error" in creditCost) {
     return NextResponse.json({ error: creditCost.error }, { status: 400 });

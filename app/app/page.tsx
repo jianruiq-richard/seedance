@@ -304,7 +304,9 @@ export default function AppPage() {
           ? calculateImageCreditCost({
               model: imageModel,
               size: imageSize,
-              hasReferenceImage: Boolean(referenceUrls.image),
+              referenceImageCount: referenceUrls.image ? 1 : 0,
+              sequentialImageGeneration,
+              maxImages,
             })
           : calculateCreditCost({
               resolution,
@@ -335,6 +337,8 @@ export default function AppPage() {
     generationProduct,
     imageModel,
     imageSize,
+    sequentialImageGeneration,
+    maxImages,
     referenceUrls.image,
     referenceUrls.video,
     referenceDurations.video,
