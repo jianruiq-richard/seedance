@@ -980,7 +980,7 @@ export default function AppPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0b10] text-white">
+    <div className="min-h-screen overflow-x-hidden bg-[#0a0b10] text-white">
       <div className="border-b border-white/10 bg-[#0c0f18]">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex min-w-0 items-center gap-3">
@@ -995,7 +995,7 @@ export default function AppPage() {
             </Link>
             {isSignedIn ? (
               <>
-                <div className="hidden items-center gap-3 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 md:flex">
+                <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-white/70 sm:gap-3">
                   <span className="text-white/60">Credits</span>
                   <span className="font-semibold text-white">{credits}</span>
                 </div>
@@ -1051,17 +1051,17 @@ export default function AppPage() {
         </div>
       )}
 
-      <div className="mx-auto grid w-full max-w-6xl gap-5 px-4 py-5 sm:gap-8 sm:px-6 sm:py-10 lg:grid-cols-[360px_minmax(0,1fr)]">
-        <section className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur sm:rounded-3xl sm:p-6">
+      <div className="mx-auto grid w-full max-w-6xl min-w-0 gap-5 px-4 py-5 sm:gap-8 sm:px-6 sm:py-10 lg:grid-cols-[360px_minmax(0,1fr)]">
+        <section className="min-w-0 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur sm:rounded-3xl sm:p-6">
           <div className="space-y-4 sm:mt-2">
-            <div className="grid grid-cols-2 gap-2 rounded-2xl border border-white/10 bg-black/20 p-1">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 rounded-2xl border border-white/10 bg-black/20 p-1">
               {[
                 ["video", "Video Generation"],
                 ["image", "Image Generation"],
               ].map(([value, label]) => (
                 <button
                   key={value}
-                  className={`rounded-xl px-3 py-2 text-xs font-semibold transition ${
+                  className={`min-w-0 truncate rounded-xl px-2 py-2 text-xs font-semibold transition sm:px-3 ${
                     generationProduct === value
                       ? "bg-white text-[#0a0b10]"
                       : "text-white/65 hover:text-white"
@@ -1088,7 +1088,7 @@ export default function AppPage() {
                 References
               </label>
               <label
-                className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-5 text-center text-xs transition sm:py-6 ${
+                className={`flex min-w-0 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed px-4 py-5 text-center text-xs transition sm:py-6 ${
                   dragActive
                     ? "border-white/80 bg-white/5 text-white"
                     : "border-white/20 bg-black/20 text-white/60 hover:border-white/50"
@@ -1150,7 +1150,7 @@ export default function AppPage() {
                 return (
                   <div
                     key={kind}
-                    className="rounded-2xl border border-white/10 bg-black/20 p-3"
+                    className="min-w-0 rounded-2xl border border-white/10 bg-black/20 p-3"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex min-w-0 flex-1 items-center gap-3">
@@ -1231,13 +1231,13 @@ export default function AppPage() {
             </div>
 
             {generationProduct === "video" ? (
-            <div className="grid gap-4">
+            <div className="grid min-w-0 gap-4">
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
                   Model
                 </label>
                 <select
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  className="mt-2 w-full min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
                   value={model}
                   onChange={(event) => setModel(event.target.value)}
                 >
@@ -1253,7 +1253,7 @@ export default function AppPage() {
                   Resolution
                 </label>
                 <select
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  className="mt-2 w-full min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
                   value={resolution}
                   onChange={(event) =>
                     setResolution(event.target.value as typeof resolution)
@@ -1270,11 +1270,11 @@ export default function AppPage() {
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
                   Ratio
                 </label>
-                <div className="mt-2 grid grid-cols-3 gap-2 sm:flex sm:flex-wrap">
+                <div className="mt-2 grid grid-cols-[repeat(3,minmax(0,1fr))] gap-2 sm:flex sm:flex-wrap">
                   {ratios.map((item) => (
                     <button
                       key={item.value}
-                      className={`rounded-full border px-3 py-2 text-xs transition sm:px-4 ${
+                      className={`min-w-0 truncate rounded-full border px-2 py-2 text-xs transition sm:px-4 ${
                         ratio === item.value
                           ? "border-white bg-white text-[#0a0b10]"
                           : "border-white/20 text-white/70"
@@ -1291,11 +1291,11 @@ export default function AppPage() {
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
                   Duration (seconds)
                 </label>
-                <div className="mt-2 grid grid-cols-4 gap-2 sm:flex sm:flex-wrap">
+                <div className="mt-2 grid grid-cols-[repeat(4,minmax(0,1fr))] gap-2 sm:flex sm:flex-wrap">
                   {durations.map((item) => (
                     <button
                       key={item}
-                      className={`rounded-full border px-3 py-2 text-xs transition sm:px-4 ${
+                      className={`min-w-0 truncate rounded-full border px-2 py-2 text-xs transition sm:px-4 ${
                         duration === item
                           ? "border-white bg-white text-[#0a0b10]"
                           : "border-white/20 text-white/70"
@@ -1313,7 +1313,7 @@ export default function AppPage() {
                   Seed (-1 for random)
                 </label>
                 <input
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  className="mt-2 w-full min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
                   type="number"
                   value={seed}
                   onChange={(event) => setSeed(Number(event.target.value))}
@@ -1352,7 +1352,7 @@ export default function AppPage() {
                   Execution expires after (seconds)
                 </label>
                 <input
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  className="mt-2 w-full min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
                   type="number"
                   min={3600}
                   max={259200}
@@ -1364,13 +1364,13 @@ export default function AppPage() {
               </div>
             </div>
             ) : (
-            <div className="grid gap-4">
+            <div className="grid min-w-0 gap-4">
               <div>
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
                   Model
                 </label>
                 <select
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  className="mt-2 w-full min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
                   value={imageModel}
                   onChange={(event) => {
                     const nextModel = event.target.value;
@@ -1393,7 +1393,7 @@ export default function AppPage() {
                   Size
                 </label>
                 <select
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  className="mt-2 w-full min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
                   value={imageSize}
                   onChange={(event) =>
                     setImageSize(event.target.value as typeof imageSize)
@@ -1410,11 +1410,11 @@ export default function AppPage() {
                 <label className="text-xs uppercase tracking-[0.2em] text-white/50">
                   Output format
                 </label>
-                <div className="mt-2 grid grid-cols-2 gap-2">
+                <div className="mt-2 grid grid-cols-[repeat(2,minmax(0,1fr))] gap-2">
                   {(["jpeg", "png"] as const).map((item) => (
                     <button
                       key={item}
-                      className={`rounded-full border px-3 py-2 text-xs uppercase transition ${
+                      className={`min-w-0 truncate rounded-full border px-3 py-2 text-xs uppercase transition ${
                         imageOutputFormat === item
                           ? "border-white bg-white text-[#0a0b10]"
                           : "border-white/20 text-white/70"
@@ -1432,7 +1432,7 @@ export default function AppPage() {
                   Seed (-1 for random)
                 </label>
                 <input
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                  className="mt-2 w-full min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
                   type="number"
                   value={seed}
                   onChange={(event) => setSeed(Number(event.target.value))}
@@ -1484,7 +1484,7 @@ export default function AppPage() {
                     Max images
                   </label>
                   <input
-                    className="mt-2 w-full rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
+                    className="mt-2 w-full min-w-0 rounded-2xl border border-white/10 bg-black/20 px-4 py-3 text-sm text-white/80 outline-none"
                     type="number"
                     min={1}
                     max={15}
@@ -1540,7 +1540,7 @@ export default function AppPage() {
           </div>
         </section>
 
-        <section className="space-y-5 sm:space-y-6">
+        <section className="min-w-0 space-y-5 sm:space-y-6">
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur sm:rounded-3xl sm:p-6">
             <div className="flex items-center justify-between text-xs text-white/60">
               <span>Preview</span>
@@ -1549,7 +1549,7 @@ export default function AppPage() {
               </span>
             </div>
             <div
-              className="relative mt-4 flex min-h-[220px] items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/20 sm:min-h-[320px]"
+              className="relative mt-4 flex w-full max-w-full min-h-[160px] items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 bg-black/20 sm:min-h-[320px]"
               style={{ aspectRatio: `${aspectSize.width}/${aspectSize.height}` }}
             >
               {generatedImageUrl ? (
@@ -1569,7 +1569,7 @@ export default function AppPage() {
                   loop
                 />
               ) : status === "generating" ? (
-                <div className="relative flex h-full min-h-[220px] w-full items-center justify-center overflow-hidden sm:min-h-[320px]">
+                <div className="relative flex h-full min-h-[160px] w-full items-center justify-center overflow-hidden sm:min-h-[320px]">
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(247,197,120,0.16),transparent_34%),linear-gradient(135deg,rgba(255,255,255,0.08),transparent_42%)]" />
                   <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_center,white_1px,transparent_1px)] bg-[length:22px_22px]" />
                   <div className="absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f7c578]/10 blur-3xl" />
