@@ -28,7 +28,7 @@ export default function PrivacyPage() {
       <h2>Contact</h2>
       <p>
         Email:{" "}
-        <a href="mailto:support@seedance.technology">support@seedance.technology</a>
+        <a href="mailto:contact@astromar.org">contact@astromar.org</a>
       </p>
     </main>
   );

@@ -6,8 +6,8 @@ export default function ContactPage() {
       <h1>Contact</h1>
       <p>
         Email:{" "}
-        <a href="mailto:support@seedance.technology">support@seedance.technology</a>
+        <a href="mailto:contact@astromar.org">contact@astromar.org</a>
       </p>
     </main>
   );
-} 
+}

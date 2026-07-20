@@ -40,8 +40,8 @@ export default function RefundPage() {
             <h2 className="text-lg font-semibold text-white">Support</h2>
             <p className="mt-2">
               Email{" "}
-              <a className="text-[#f7c578] hover:underline" href="mailto:support@seedance.technology">
-                support@seedance.technology
+              <a className="text-[#f7c578] hover:underline" href="mailto:contact@astromar.org">
+                contact@astromar.org
               </a>{" "}
               for billing help. Include your account email, transaction date,
               and a short description of the issue.
