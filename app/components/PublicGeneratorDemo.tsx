@@ -194,10 +194,7 @@ export default function PublicGeneratorDemo() {
 
   const handleGenerate = () => {
     if (!isSignedIn) {
-      setNotice("Sign in is required before generation. Draft inputs are not saved.");
-      window.setTimeout(() => {
-        window.location.href = "/sign-in?redirect_url=/app";
-      }, 350);
+      window.location.href = "/sign-in?redirect_url=/app";
       return;
     }
 
